@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Radar Licitacoes</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', Tahoma, sans-serif; background: #0f172a; color: #e2e8f0; min-height: 100vh; }
+
+        .header { background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%); padding: 20px 30px; border-bottom: 1px solid #334155; display: flex; justify-content: space-between; align-items: center; }
+        .header h1 { font-size: 24px; color: #38bdf8; }
+        .header h1 span { color: #f59e0b; }
+        .header-actions { display: flex; gap: 10px; }
+        .btn { padding: 8px 16px; border: none; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: 600; transition: all 0.2s; }
+        .btn-primary { background: #3b82f6; color: white; }
+        .btn-primary:hover { background: #2563eb; }
+        .btn-success { background: #10b981; color: white; }
+        .btn-success:hover { background: #059669; }
+        .btn-warning { background: #f59e0b; color: #0f172a; }
+        .btn-sm { padding: 4px 10px; font-size: 12px; }
+
+        .stats-bar { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 15px; padding: 20px 30px; }
+        .stat-card { background: #1e293b; border-radius: 10px; padding: 16px; border: 1px solid #334155; }
+        .stat-card .label { font-size: 12px; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.5px; }
+        .stat-card .value { font-size: 28px; font-weight: 700; margin-top: 4px; }
+        .stat-card .value.blue { color: #38bdf8; }
+        .stat-card .value.green { color: #10b981; }
+        .stat-card .value.yellow { color: #f59e0b; }
+        .stat-card .value.red { color: #ef4444; }
+
+        .filters { background: #1e293b; margin: 0 30px; padding: 16px 20px; border-radius: 10px; border: 1px solid #334155; display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+        .filters input, .filters select { background: #0f172a; border: 1px solid #475569; color: #e2e8f0; padding: 8px 12px; border-radius: 6px; font-size: 13px; }
+        .filters input:focus, .filters select:focus { outline: none; border-color: #3b82f6; }
+        .filters input[type="text"] { width: 250px; }
+        .filters label { font-size: 12px; color: #94a3b8; display: flex; align-items: center; gap: 4px; cursor: pointer; }
+
+        .content { padding: 20px 30px; }
+        .table-wrap { background: #1e293b; border-radius: 10px; border: 1px solid #334155; overflow-x: auto; }
+        table { width: 100%; border-collapse: collapse; }
+        thead th { background: #334155; padding: 12px 14px; text-align: left; font-size: 12px; text-transform: uppercase; color: #94a3b8; letter-spacing: 0.5px; position: sticky; top: 0; }
+        tbody td { padding: 10px 14px; border-bottom: 1px solid #1e293b; font-size: 13px; vertical-align: top; }
+        tbody tr { background: #1e293b; transition: background 0.15s; }
+        tbody tr:hover { background: #263348; }
+        tbody tr.favorita { border-left: 3px solid #f59e0b; }
+
+        .badge { display: inline-block; padding: 3px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; }
+        .badge-blue { background: #1e40af30; color: #60a5fa; }
+        .badge-green { background: #05966930; color: #34d399; }
+        .badge-yellow { background: #b4530030; color: #fbbf24; }
+        .badge-red { background: #991b1b30; color: #f87171; }
+        .badge-purple { background: #6b21a830; color: #c084fc; }
+
+        .objeto-text { max-width: 350px; line-height: 1.4; }
+        .objeto-text .truncated { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+
+        .star { cursor: pointer; font-size: 18px; transition: transform 0.2s; }
+        .star:hover { transform: scale(1.3); }
+        .star.active { color: #f59e0b; }
+        .star.inactive { color: #475569; }
+
+        .status-select { background: #0f172a; border: 1px solid #475569; color: #e2e8f0; padding: 4px 6px; border-radius: 4px; font-size: 12px; }
+
+        .link-btn { color: #38bdf8; text-decoration: none; font-weight: 600; }
+        .link-btn:hover { text-decoration: underline; }
+
+        .valor { font-weight: 600; color: #10b981; white-space: nowrap; }
+
+        .empty-state { text-align: center; padding: 60px 20px; color: #64748b; }
+        .empty-state p { font-size: 18px; margin-bottom: 8px; }
+
+        .loading { text-align: center; padding: 40px; color: #64748b; }
+
+        .pagination { display: flex; justify-content: center; gap: 8px; padding: 20px; }
+        .pagination button { background: #334155; color: #e2e8f0; border: none; padding: 8px 14px; border-radius: 6px; cursor: pointer; }
+        .pagination button:hover { background: #475569; }
+        .pagination button.active { background: #3b82f6; }
+
+        .notas-input { background: #0f172a; border: 1px solid #475569; color: #e2e8f0; padding: 4px 8px; border-radius: 4px; font-size: 12px; width: 150px; }
+
+        .portal-badge { font-size: 10px; font-weight: 700; padding: 2px 6px; border-radius: 3px; }
+        .portal-PNCP { background: #1d4ed830; color: #60a5fa; }
+        .portal-ComprasNet { background: #05966930; color: #34d399; }
+
+        @media (max-width: 768px) {
+            .filters { flex-direction: column; }
+            .filters input[type="text"] { width: 100%; }
+            .stats-bar { grid-template-columns: repeat(2, 1fr); }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>Radar <span>Licitacoes</span></h1>
+        <div class="header-actions">
+            <button class="btn btn-primary" onclick="carregarDados()">Atualizar</button>
+            <button class="btn btn-success" onclick="exportarCSV()">Exportar CSV</button>
+        </div>
+    </div>
+
+    <div class="stats-bar" id="stats-bar">
+        <div class="stat-card"><div class="label">Total</div><div class="value blue" id="st-total">-</div></div>
+        <div class="stat-card"><div class="label">Novas</div><div class="value green" id="st-novas">-</div></div>
+        <div class="stat-card"><div class="label">Em Analise</div><div class="value yellow" id="st-analise">-</div></div>
+        <div class="stat-card"><div class="label">Favoritas</div><div class="value red" id="st-fav">-</div></div>
+        <div class="stat-card"><div class="label">Valor Total Estimado</div><div class="value green" id="st-valor">-</div></div>
+    </div>
+
+    <div class="filters">
+        <input type="text" id="f-busca" placeholder="Buscar no objeto..." oninput="debounce(carregarDados, 400)()">
+        <select id="f-uf" onchange="carregarDados()">
+            <option value="">Todos UFs</option>
+        </select>
+        <select id="f-modalidade" onchange="carregarDados()">
+            <option value="">Todas Modalidades</option>
+        </select>
+        <select id="f-status" onchange="carregarDados()">
+            <option value="">Todos Status</option>
+            <option value="nova">Nova</option>
+            <option value="em_analise">Em Analise</option>
+            <option value="proposta_enviada">Proposta Enviada</option>
+            <option value="ganha">Ganha</option>
+            <option value="perdida">Perdida</option>
+            <option value="descartada">Descartada</option>
+        </select>
+        <select id="f-portal" onchange="carregarDados()">
+            <option value="">Todos Portais</option>
+            <option value="PNCP">PNCP</option>
+            <option value="ComprasNet">ComprasNet</option>
+        </select>
+        <label><input type="checkbox" id="f-fav" onchange="carregarDados()"> Favoritas</label>
+        <input type="date" id="f-data-de" onchange="carregarDados()" title="Data de">
+        <input type="date" id="f-data-ate" onchange="carregarDados()" title="Data ate">
+    </div>
+
+    <div class="content">
+        <div class="table-wrap">
+            <table>
+                <thead>
+                    <tr>
+                        <th></th>
+                        <th>Portal</th>
+                        <th>Modalidade</th>
+                        <th>UF</th>
+                        <th>Orgao / Unidade</th>
+                        <th>Objeto</th>
+                        <th>Valor Estimado</th>
+                        <th>Publicacao</th>
+                        <th>Encerramento</th>
+                        <th>Status</th>
+                        <th>Notas</th>
+                        <th>Link</th>
+                    </tr>
+                </thead>
+                <tbody id="tabela-body">
+                    <tr><td colspan="12" class="loading">Carregando...</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+<script>
+let dadosAtuais = [];
+let _debounceTimers = {};
+
+function debounce(fn, ms) {
+    return function() {
+        clearTimeout(_debounceTimers[fn.name]);
+        _debounceTimers[fn.name] = setTimeout(fn, ms);
+    };
+}
+
+function formatarValor(v) {
+    if (!v && v !== 0) return 'N/I';
+    return 'R$ ' + Number(v).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+}
+
+function formatarData(d) {
+    if (!d) return 'N/I';
+    try {
+        let dt = new Date(d);
+        return dt.toLocaleDateString('pt-BR') + ' ' + dt.toLocaleTimeString('pt-BR', {hour:'2-digit', minute:'2-digit'});
+    } catch(e) { return d; }
+}
+
+function badgeStatus(s) {
+    const cores = {nova:'blue', em_analise:'yellow', proposta_enviada:'purple', ganha:'green', perdida:'red', descartada:'red'};
+    const nomes = {nova:'Nova', em_analise:'Em Analise', proposta_enviada:'Proposta Enviada', ganha:'Ganha', perdida:'Perdida', descartada:'Descartada'};
+    return `<span class="badge badge-${cores[s]||'blue'}">${nomes[s]||s}</span>`;
+}
+
+async function carregarEstatisticas() {
+    try {
+        const r = await fetch('/api/estatisticas');
+        const s = await r.json();
+        document.getElementById('st-total').textContent = s.total;
+        document.getElementById('st-novas').textContent = s.novas;
+        document.getElementById('st-analise').textContent = s.em_analise;
+        document.getElementById('st-fav').textContent = s.favoritas;
+        document.getElementById('st-valor').textContent = formatarValor(s.valor_total);
+
+        // Preencher filtro UF
+        const ufSel = document.getElementById('f-uf');
+        const ufAtual = ufSel.value;
+        ufSel.innerHTML = '<option value="">Todos UFs</option>';
+        (s.por_uf || []).forEach(u => {
+            ufSel.innerHTML += `<option value="${u.uf}">${u.uf} (${u.qtd})</option>`;
+        });
+        ufSel.value = ufAtual;
+
+        // Preencher filtro modalidade
+        const modSel = document.getElementById('f-modalidade');
+        const modAtual = modSel.value;
+        modSel.innerHTML = '<option value="">Todas Modalidades</option>';
+        (s.por_modalidade || []).forEach(m => {
+            if (m.modalidade_nome) modSel.innerHTML += `<option value="${m.modalidade_nome}">${m.modalidade_nome} (${m.qtd})</option>`;
+        });
+        modSel.value = modAtual;
+    } catch(e) { console.error('Erro stats:', e); }
+}
+
+async function carregarDados() {
+    const params = new URLSearchParams();
+    const busca = document.getElementById('f-busca').value;
+    const uf = document.getElementById('f-uf').value;
+    const status = document.getElementById('f-status').value;
+    const portal = document.getElementById('f-portal').value;
+    const fav = document.getElementById('f-fav').checked;
+    const dataDe = document.getElementById('f-data-de').value;
+    const dataAte = document.getElementById('f-data-ate').value;
+
+    if (busca) params.set('busca', busca);
+    if (uf) params.set('uf', uf);
+    if (status) params.set('status', status);
+    if (portal) params.set('portal', portal);
+    if (fav) params.set('favorito', '1');
+    if (dataDe) params.set('data_de', dataDe);
+    if (dataAte) params.set('data_ate', dataAte);
+
+    try {
+        const r = await fetch('/api/oportunidades?' + params.toString());
+        dadosAtuais = await r.json();
+        renderTabela(dadosAtuais);
+        carregarEstatisticas();
+    } catch(e) {
+        document.getElementById('tabela-body').innerHTML = '<tr><td colspan="12" class="empty-state"><p>Erro ao carregar dados</p></td></tr>';
+    }
+}
+
+function renderTabela(dados) {
+    const tbody = document.getElementById('tabela-body');
+    if (!dados.length) {
+        tbody.innerHTML = '<tr><td colspan="12" class="empty-state"><p>Nenhuma oportunidade encontrada</p><p>Execute o bot para buscar novas licitacoes</p></td></tr>';
+        return;
+    }
+
+    tbody.innerHTML = dados.map(op => `
+        <tr class="${op.favorito ? 'favorita' : ''}">
+            <td><span class="star ${op.favorito ? 'active' : 'inactive'}" onclick="toggleFav('${op.id}')">&#9733;</span></td>
+            <td><span class="portal-badge portal-${op.portal}">${op.portal}</span></td>
+            <td><span class="badge badge-blue">${op.modalidade_nome || 'N/I'}</span></td>
+            <td><strong>${op.uf || 'N/I'}</strong></td>
+            <td><strong>${op.orgao || ''}</strong><br><small style="color:#94a3b8">${op.unidade || ''}</small></td>
+            <td class="objeto-text"><div class="truncated" title="${(op.objeto||'').replace(/"/g,'&quot;')}">${op.objeto || 'Sem descricao'}</div></td>
+            <td class="valor">${formatarValor(op.valor_estimado)}</td>
+            <td>${formatarData(op.data_publicacao)}</td>
+            <td>${formatarData(op.data_encerramento)}</td>
+            <td>
+                <select class="status-select" onchange="mudarStatus('${op.id}', this.value)">
+                    <option value="nova" ${op.status==='nova'?'selected':''}>Nova</option>
+                    <option value="em_analise" ${op.status==='em_analise'?'selected':''}>Em Analise</option>
+                    <option value="proposta_enviada" ${op.status==='proposta_enviada'?'selected':''}>Proposta Enviada</option>
+                    <option value="ganha" ${op.status==='ganha'?'selected':''}>Ganha</option>
+                    <option value="perdida" ${op.status==='perdida'?'selected':''}>Perdida</option>
+                    <option value="descartada" ${op.status==='descartada'?'selected':''}>Descartada</option>
+                </select>
+            </td>
+            <td><input class="notas-input" value="${(op.notas||'').replace(/"/g,'&quot;')}" onblur="salvarNotas('${op.id}', this.value)" placeholder="Anotacoes..."></td>
+            <td>${op.link && op.link !== 'Nao disponivel' ? `<a class="link-btn" href="${op.link}" target="_blank">Abrir</a>` : 'N/D'}</td>
+        </tr>
+    `).join('');
+}
+
+async function toggleFav(id) {
+    await fetch(`/api/oportunidades/${id}/favorito`, {method:'POST'});
+    carregarDados();
+}
+
+async function mudarStatus(id, status) {
+    await fetch(`/api/oportunidades/${id}/status`, {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({status})});
+    carregarEstatisticas();
+}
+
+async function salvarNotas(id, notas) {
+    await fetch(`/api/oportunidades/${id}/notas`, {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({notas})});
+}
+
+function exportarCSV() {
+    if (!dadosAtuais.length) return alert('Nenhum dado para exportar');
+    const headers = ['Portal','Modalidade','UF','Orgao','Unidade','Objeto','Valor Estimado','Publicacao','Encerramento','Status','Notas','Link'];
+    const rows = dadosAtuais.map(op => [
+        op.portal, op.modalidade_nome, op.uf, op.orgao, op.unidade,
+        `"${(op.objeto||'').replace(/"/g,'""')}"`,
+        op.valor_estimado, op.data_publicacao, op.data_encerramento,
+        op.status, `"${(op.notas||'').replace(/"/g,'""')}"`, op.link
+    ]);
+    let csv = '\uFEFF' + headers.join(';') + '\n' + rows.map(r => r.join(';')).join('\n');
+    const blob = new Blob([csv], {type: 'text/csv;charset=utf-8;'});
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'licitacoes_' + new Date().toISOString().slice(0,10) + '.csv';
+    a.click();
+}
+
+carregarDados();
+</script>
+</body>
+</html>

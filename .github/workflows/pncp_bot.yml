@@ -1,0 +1,47 @@
+name: PNCP Bot
+
+on:
+  schedule:
+    - cron: '0 10-23 * * 1-5'  # De hora em hora, 7h-20h Brasília (seg-sex)
+  workflow_dispatch:  # permite rodar manualmente
+
+jobs:
+  run-bot:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: pip install requests
+
+      - name: Download cache anterior
+        uses: dawidd6/action-download-artifact@v6
+        with:
+          name: pncp-cache
+          path: .
+          if_no_artifact_found: warn
+          workflow_conclusion: ''
+        continue-on-error: true
+
+      - name: Criar config com secrets
+        run: |
+          echo '${{ secrets.CONFIG_JSON }}' > config_cloud.json
+
+      - name: Executar bot
+        run: python pncp_telegram_bot.py --config config_cloud.json
+
+      - name: Upload cache (enviados + banco)
+        uses: actions/upload-artifact@v4
+        with:
+          name: pncp-cache
+          path: |
+            enviados.json
+            licitacoes.db
+          overwrite: true
+          retention-days: 90
