@@ -1,0 +1,16 @@
+.env
+__pycache__/
+*.pyc
+data/licitacoes.db
+data/editais/*.pdf
+data/licitacoes.log
+*.egg-info/
+dist/
+build/
+.venv/
+venv/
+node_modules/
+frontend/dist/
+.DS_Store
+Thumbs.db
+bot.lock

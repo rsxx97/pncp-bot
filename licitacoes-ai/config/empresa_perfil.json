@@ -1,0 +1,62 @@
+{
+  "empresas": [
+    {
+      "nome": "Manutec",
+      "cnpj": "PREENCHER",
+      "cnaes": ["8121-4/00", "8111-7/00", "8130-3/00", "7810-8/00"],
+      "regime_tributario": "lucro_real",
+      "servicos": ["limpeza", "conservação", "facilities", "mão de obra terceirizada"],
+      "atestados_disponiveis": [
+        "limpeza predial (área mínima 5.000m²)",
+        "conservação e manutenção predial",
+        "terceirização de mão de obra administrativa"
+      ],
+      "restricoes": {
+        "sancao_agu": {
+          "ativa": true,
+          "orgao": "AGU",
+          "abrangencia": "nacional",
+          "vigencia_ate": "2026-06-30",
+          "nota": "Impede participação em licitações federais até o fim da vigência"
+        }
+      },
+      "uf_atuacao": ["RJ", "ES", "MG", "SP", "CE", "AC"]
+    },
+    {
+      "nome": "Blue Soluções Corporativas",
+      "cnpj": "PREENCHER",
+      "cnaes": ["8211-3/00", "7810-8/00", "8219-9/99"],
+      "regime_tributario": "lucro_real",
+      "servicos": ["apoio administrativo", "recepção", "portaria", "copeiragem"],
+      "atestados_disponiveis": [
+        "serviços de recepção e portaria",
+        "apoio administrativo"
+      ],
+      "restricoes": {},
+      "uf_atuacao": ["RJ"]
+    },
+    {
+      "nome": "Miami Segurança e Serviços",
+      "cnpj": "PREENCHER",
+      "cnaes": ["8012-9/00", "8011-1/01", "8020-0/01"],
+      "regime_tributario": "lucro_real",
+      "servicos": ["vigilância patrimonial", "segurança", "brigada de incêndio"],
+      "atestados_disponiveis": [
+        "vigilância patrimonial armada e desarmada",
+        "segurança patrimonial"
+      ],
+      "restricoes": {},
+      "uf_atuacao": ["RJ"]
+    },
+    {
+      "nome": "Advanced Seguros",
+      "cnpj": "PREENCHER",
+      "cnaes": [],
+      "regime_tributario": "lucro_presumido",
+      "servicos": ["seguros", "consultoria em seguros"],
+      "atestados_disponiveis": [],
+      "restricoes": {},
+      "uf_atuacao": ["RJ"]
+    }
+  ]
+}

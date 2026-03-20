@@ -1,0 +1,44 @@
+{
+  "concorrentes": [
+    {
+      "cnpj": "PREENCHER",
+      "razao_social": "Nova Rio Serviços Gerais Ltda",
+      "nome_fantasia": "Nova Rio",
+      "segmentos": ["limpeza", "conservação", "facilities"],
+      "uf_principal": "RJ",
+      "notas": "Maior concorrente em limpeza no RJ. Muito agressivo em preço."
+    },
+    {
+      "cnpj": "PREENCHER",
+      "razao_social": "Personal Service Recursos Humanos e Assessoria Empresarial",
+      "nome_fantasia": "Personal Service",
+      "segmentos": ["apoio administrativo", "recepção", "limpeza"],
+      "uf_principal": "RJ",
+      "notas": "Forte em terceirização administrativa."
+    },
+    {
+      "cnpj": "PREENCHER",
+      "razao_social": "MGS Clean Serviços Ltda",
+      "nome_fantasia": "MGS Clean",
+      "segmentos": ["limpeza", "conservação"],
+      "uf_principal": "RJ",
+      "notas": "Empresa menor, costuma ser agressiva em pregões de menor porte."
+    },
+    {
+      "cnpj": "PREENCHER",
+      "razao_social": "FERTHYMAR Serviços Ltda",
+      "nome_fantasia": "FERTHYMAR",
+      "segmentos": ["limpeza", "facilities"],
+      "uf_principal": "RJ",
+      "notas": "Concorrente frequente em pregões estaduais RJ."
+    },
+    {
+      "cnpj": "PREENCHER",
+      "razao_social": "GPS Participações e Empreendimentos S.A.",
+      "nome_fantasia": "Grupo GPS",
+      "segmentos": ["limpeza", "segurança", "facilities", "logística"],
+      "uf_principal": "SP",
+      "notas": "Maior grupo do Brasil em facilities. Entra em licitações grandes (>R$10M)."
+    }
+  ]
+}

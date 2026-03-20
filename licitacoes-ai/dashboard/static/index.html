@@ -1,0 +1,730 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Licitacoes AI Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+    <style>
+        :root {
+            --bg: #0f172a;
+            --surface: #1e293b;
+            --surface2: #334155;
+            --border: #475569;
+            --text: #e2e8f0;
+            --text2: #94a3b8;
+            --primary: #3b82f6;
+            --success: #22c55e;
+            --warning: #f59e0b;
+            --danger: #ef4444;
+            --info: #06b6d4;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+        }
+
+        .header {
+            background: var(--surface);
+            border-bottom: 1px solid var(--border);
+            padding: 1rem 2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .header h1 { font-size: 1.5rem; font-weight: 700; }
+        .header h1 span { color: var(--primary); }
+
+        .header-actions { display: flex; gap: 0.5rem; }
+
+        .btn {
+            padding: 0.5rem 1rem;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            background: var(--surface2);
+            color: var(--text);
+            cursor: pointer;
+            font-size: 0.875rem;
+            transition: all 0.2s;
+        }
+
+        .btn:hover { background: var(--border); }
+        .btn-primary { background: var(--primary); border-color: var(--primary); }
+        .btn-primary:hover { opacity: 0.85; }
+        .btn-success { background: var(--success); border-color: var(--success); color: #000; }
+        .btn-danger { background: var(--danger); border-color: var(--danger); }
+        .btn-sm { padding: 0.25rem 0.5rem; font-size: 0.75rem; }
+
+        .tabs {
+            display: flex;
+            gap: 0;
+            background: var(--surface);
+            border-bottom: 1px solid var(--border);
+            padding: 0 2rem;
+        }
+
+        .tab {
+            padding: 0.75rem 1.25rem;
+            cursor: pointer;
+            border-bottom: 2px solid transparent;
+            color: var(--text2);
+            transition: all 0.2s;
+        }
+
+        .tab:hover { color: var(--text); }
+        .tab.active { color: var(--primary); border-color: var(--primary); }
+
+        .container { padding: 1.5rem 2rem; max-width: 1400px; margin: 0 auto; }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .stat-card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 1.25rem;
+        }
+
+        .stat-card .label { color: var(--text2); font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.05em; }
+        .stat-card .value { font-size: 1.75rem; font-weight: 700; margin-top: 0.25rem; }
+        .stat-card .sub { color: var(--text2); font-size: 0.8rem; margin-top: 0.25rem; }
+
+        .card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 1.25rem;
+            margin-bottom: 1rem;
+        }
+
+        .card-title { font-size: 1rem; font-weight: 600; margin-bottom: 1rem; }
+
+        .charts-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1rem;
+            margin-bottom: 1.5rem;
+        }
+
+        table { width: 100%; border-collapse: collapse; }
+        th, td { padding: 0.6rem 0.75rem; text-align: left; border-bottom: 1px solid var(--border); }
+        th { color: var(--text2); font-weight: 600; font-size: 0.8rem; text-transform: uppercase; }
+        td { font-size: 0.875rem; }
+        tr:hover td { background: rgba(59, 130, 246, 0.05); }
+
+        .badge {
+            display: inline-block;
+            padding: 0.15rem 0.5rem;
+            border-radius: 999px;
+            font-size: 0.7rem;
+            font-weight: 600;
+        }
+
+        .badge-novo { background: var(--primary); color: #fff; }
+        .badge-analisado { background: var(--info); color: #000; }
+        .badge-precificado { background: var(--warning); color: #000; }
+        .badge-pronto { background: var(--success); color: #000; }
+        .badge-nogo { background: var(--danger); color: #fff; }
+        .badge-favorito { background: #a855f7; color: #fff; }
+        .badge-urgente { background: var(--danger); color: #fff; animation: pulse 1s infinite; }
+        .badge-vencendo { background: var(--warning); color: #000; }
+
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+
+        .urgente { border-left: 3px solid var(--danger); }
+        .vencendo { border-left: 3px solid var(--warning); }
+
+        .filters {
+            display: flex;
+            gap: 0.75rem;
+            margin-bottom: 1rem;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+
+        .filters input, .filters select {
+            padding: 0.5rem;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            background: var(--surface2);
+            color: var(--text);
+            font-size: 0.875rem;
+        }
+
+        .filters input { min-width: 250px; }
+
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.6);
+            z-index: 100;
+            justify-content: center;
+            align-items: flex-start;
+            padding-top: 5vh;
+        }
+
+        .modal-overlay.show { display: flex; }
+
+        .modal {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            width: 90%;
+            max-width: 700px;
+            max-height: 85vh;
+            overflow-y: auto;
+            padding: 1.5rem;
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1rem;
+        }
+
+        .modal-close { background: none; border: none; color: var(--text2); cursor: pointer; font-size: 1.5rem; }
+
+        .comment-box {
+            display: flex;
+            gap: 0.5rem;
+            margin-top: 1rem;
+        }
+
+        .comment-box input {
+            flex: 1;
+            padding: 0.5rem;
+            background: var(--surface2);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            color: var(--text);
+        }
+
+        .timeline {
+            border-left: 2px solid var(--border);
+            padding-left: 1rem;
+            margin-top: 0.5rem;
+        }
+
+        .timeline-item {
+            margin-bottom: 0.75rem;
+            position: relative;
+        }
+
+        .timeline-item::before {
+            content: '';
+            position: absolute;
+            left: -1.35rem;
+            top: 0.4rem;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--primary);
+        }
+
+        .timeline-item .meta { color: var(--text2); font-size: 0.75rem; }
+        .timeline-item .content { font-size: 0.875rem; margin-top: 0.15rem; }
+
+        .hidden { display: none; }
+
+        .loading { text-align: center; padding: 2rem; color: var(--text2); }
+
+        @media (max-width: 768px) {
+            .charts-grid { grid-template-columns: 1fr; }
+            .stats-grid { grid-template-columns: repeat(2, 1fr); }
+            .container { padding: 1rem; }
+            .header { padding: 0.75rem 1rem; }
+            .tabs { padding: 0 1rem; overflow-x: auto; }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>Licitacoes <span>AI</span></h1>
+        <div class="header-actions">
+            <button class="btn" onclick="executarMonitor()">Executar Monitor</button>
+            <button class="btn btn-primary" onclick="carregarDados()">Atualizar</button>
+        </div>
+    </div>
+
+    <div class="tabs">
+        <div class="tab active" data-tab="oportunidades">Oportunidades</div>
+        <div class="tab" data-tab="relatorios">Relatorios</div>
+        <div class="tab" data-tab="concorrentes">Concorrentes</div>
+        <div class="tab" data-tab="execucoes">Execucoes</div>
+    </div>
+
+    <!-- TAB: Oportunidades -->
+    <div id="tab-oportunidades" class="container tab-content">
+        <div class="stats-grid" id="stats-container"></div>
+
+        <div class="filters">
+            <input type="text" id="filtro-busca" placeholder="Buscar por objeto..." oninput="filtrarEditais()">
+            <select id="filtro-status" onchange="filtrarEditais()">
+                <option value="">Todos status</option>
+                <option value="novo">Novo</option>
+                <option value="classificado">Classificado</option>
+                <option value="analisado">Analisado</option>
+                <option value="precificado">Precificado</option>
+                <option value="competitivo_pronto">Pronto p/ Lance</option>
+                <option value="favorito">Favorito</option>
+                <option value="nogo">No-Go</option>
+            </select>
+            <select id="filtro-uf" onchange="filtrarEditais()">
+                <option value="">Todas UFs</option>
+            </select>
+        </div>
+
+        <div class="card">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Score</th>
+                        <th>Objeto</th>
+                        <th>Valor</th>
+                        <th>UF</th>
+                        <th>Status</th>
+                        <th>Encerramento</th>
+                        <th>Acoes</th>
+                    </tr>
+                </thead>
+                <tbody id="editais-tbody"></tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- TAB: Relatorios -->
+    <div id="tab-relatorios" class="container tab-content hidden">
+        <div class="charts-grid">
+            <div class="card">
+                <div class="card-title">Valor Total por UF (Top 10)</div>
+                <canvas id="chart-uf"></canvas>
+            </div>
+            <div class="card">
+                <div class="card-title">Distribuicao por Modalidade</div>
+                <canvas id="chart-modalidade"></canvas>
+            </div>
+        </div>
+        <div class="card">
+            <div class="card-title">Editais por Dia (Ultimos 30 dias)</div>
+            <canvas id="chart-timeline"></canvas>
+        </div>
+    </div>
+
+    <!-- TAB: Concorrentes -->
+    <div id="tab-concorrentes" class="container tab-content hidden">
+        <div class="card">
+            <div class="card-title">Concorrentes Cadastrados</div>
+            <table>
+                <thead>
+                    <tr><th>Nome</th><th>CNPJ</th><th>Segmentos</th><th>UFs</th><th>Notas</th></tr>
+                </thead>
+                <tbody id="concorrentes-tbody"></tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- TAB: Execucoes -->
+    <div id="tab-execucoes" class="container tab-content hidden">
+        <div class="card">
+            <div class="card-title">Execucoes Recentes dos Agentes</div>
+            <table>
+                <thead>
+                    <tr><th>Agente</th><th>PNCP ID</th><th>Status</th><th>Duracao</th><th>Tokens</th><th>Custo</th><th>Data</th></tr>
+                </thead>
+                <tbody id="execucoes-tbody"></tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- MODAL Detalhe -->
+    <div class="modal-overlay" id="modal-edital">
+        <div class="modal">
+            <div class="modal-header">
+                <h3 id="modal-titulo">Detalhe do Edital</h3>
+                <button class="modal-close" onclick="fecharModal()">&times;</button>
+            </div>
+            <div id="modal-body"></div>
+        </div>
+    </div>
+
+<script>
+const API = '';
+let editaisCache = [];
+
+// ── Tabs ──────────────────────────────────────────────────
+document.querySelectorAll('.tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+        document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+        document.querySelectorAll('.tab-content').forEach(c => c.classList.add('hidden'));
+        tab.classList.add('active');
+        document.getElementById('tab-' + tab.dataset.tab).classList.remove('hidden');
+
+        if (tab.dataset.tab === 'relatorios') carregarRelatorios();
+        if (tab.dataset.tab === 'concorrentes') carregarConcorrentes();
+        if (tab.dataset.tab === 'execucoes') carregarExecucoes();
+    });
+});
+
+// ── Carregar dados ────────────────────────────────────────
+async function carregarDados() {
+    await Promise.all([carregarStats(), carregarEditais()]);
+}
+
+async function carregarStats() {
+    try {
+        const resp = await fetch(API + '/api/stats');
+        const data = await resp.json();
+        const c = document.getElementById('stats-container');
+        c.innerHTML = `
+            <div class="stat-card">
+                <div class="label">Total Editais</div>
+                <div class="value">${data.total_editais}</div>
+            </div>
+            <div class="stat-card">
+                <div class="label">Aprovados (Go)</div>
+                <div class="value" style="color:var(--success)">${data.aprovados}</div>
+                <div class="sub">Taxa: ${data.taxa_aprovacao}%</div>
+            </div>
+            <div class="stat-card">
+                <div class="label">Rejeitados</div>
+                <div class="value" style="color:var(--danger)">${data.rejeitados}</div>
+            </div>
+            <div class="stat-card">
+                <div class="label">Custo API (30d)</div>
+                <div class="value">$${data.custo_api_30d}</div>
+            </div>
+            <div class="stat-card">
+                <div class="label">Monitor</div>
+                <div class="value">${data.monitor_ativo ? '🟢 Ativo' : '🔴 Parado'}</div>
+                <div class="sub">${data.ultima_consulta || 'Nunca executado'}</div>
+            </div>
+        `;
+    } catch(e) { console.error('Erro stats:', e); }
+}
+
+async function carregarEditais() {
+    try {
+        const resp = await fetch(API + '/api/editais?limit=100');
+        const data = await resp.json();
+        editaisCache = data.editais;
+        renderEditais(editaisCache);
+
+        // Populate UF filter
+        const ufs = [...new Set(editaisCache.map(e => e.uf).filter(Boolean))].sort();
+        const sel = document.getElementById('filtro-uf');
+        sel.innerHTML = '<option value="">Todas UFs</option>' + ufs.map(u => `<option value="${u}">${u}</option>`).join('');
+    } catch(e) { console.error('Erro editais:', e); }
+}
+
+function filtrarEditais() {
+    const busca = document.getElementById('filtro-busca').value.toLowerCase();
+    const status = document.getElementById('filtro-status').value;
+    const uf = document.getElementById('filtro-uf').value;
+
+    let filtered = editaisCache;
+    if (busca) filtered = filtered.filter(e => (e.objeto||'').toLowerCase().includes(busca));
+    if (status) filtered = filtered.filter(e => e.status === status);
+    if (uf) filtered = filtered.filter(e => e.uf === uf);
+
+    renderEditais(filtered);
+}
+
+function renderEditais(editais) {
+    const tbody = document.getElementById('editais-tbody');
+    const now = new Date();
+
+    tbody.innerHTML = editais.map(e => {
+        const enc = e.data_encerramento ? new Date(e.data_encerramento) : null;
+        const horasRestantes = enc ? (enc - now) / 3600000 : 999;
+        let urgClass = '';
+        let urgBadge = '';
+
+        if (horasRestantes < 48 && horasRestantes > 0) {
+            urgClass = 'urgente';
+            urgBadge = '<span class="badge badge-urgente">URGENTE</span> ';
+        } else if (horasRestantes < 168 && horasRestantes > 0) {
+            urgClass = 'vencendo';
+            urgBadge = '<span class="badge badge-vencendo">VENCENDO</span> ';
+        }
+
+        const statusBadge = getStatusBadge(e.status);
+        const valor = e.valor_estimado ? 'R$ ' + Number(e.valor_estimado).toLocaleString('pt-BR', {minimumFractionDigits: 2}) : '-';
+        const objeto = (e.objeto || '').substring(0, 80);
+        const encStr = enc ? enc.toLocaleDateString('pt-BR') : '-';
+
+        return `<tr class="${urgClass}" onclick="abrirEdital('${e.pncp_id}')" style="cursor:pointer">
+            <td>${e.score_relevancia || '-'}</td>
+            <td>${objeto}...</td>
+            <td>${valor}</td>
+            <td>${e.uf || '-'}</td>
+            <td>${statusBadge}</td>
+            <td>${urgBadge}${encStr}</td>
+            <td>
+                <button class="btn btn-sm btn-primary" onclick="event.stopPropagation(); executarPipeline('${e.pncp_id}')">Pipeline</button>
+            </td>
+        </tr>`;
+    }).join('');
+}
+
+function getStatusBadge(status) {
+    const map = {
+        'novo': 'badge-novo',
+        'classificado': 'badge-novo',
+        'analisado': 'badge-analisado',
+        'precificado': 'badge-precificado',
+        'competitivo_pronto': 'badge-pronto',
+        'nogo': 'badge-nogo',
+        'favorito': 'badge-favorito',
+    };
+    const cls = map[status] || '';
+    return `<span class="badge ${cls}">${status || '?'}</span>`;
+}
+
+// ── Modal ─────────────────────────────────────────────────
+async function abrirEdital(pncpId) {
+    const modal = document.getElementById('modal-edital');
+    const body = document.getElementById('modal-body');
+    body.innerHTML = '<div class="loading">Carregando...</div>';
+    modal.classList.add('show');
+
+    try {
+        const resp = await fetch(API + `/api/editais/${pncpId}`);
+        const e = await resp.json();
+        const valor = e.valor_estimado ? 'R$ ' + Number(e.valor_estimado).toLocaleString('pt-BR', {minimumFractionDigits:2}) : '-';
+
+        let html = `
+            <p><strong>Orgao:</strong> ${e.orgao_nome || '-'}</p>
+            <p><strong>Objeto:</strong> ${e.objeto || '-'}</p>
+            <p><strong>Valor:</strong> ${valor}</p>
+            <p><strong>UF:</strong> ${e.uf} | <strong>Municipio:</strong> ${e.municipio || '-'}</p>
+            <p><strong>Abertura:</strong> ${e.data_abertura || '-'} | <strong>Encerramento:</strong> ${e.data_encerramento || '-'}</p>
+            <p><strong>Score:</strong> ${e.score_relevancia || '-'}/100 | <strong>Status:</strong> ${getStatusBadge(e.status)}</p>
+            <p><strong>Empresa sugerida:</strong> ${e.empresa_sugerida || '-'}</p>
+            <p><strong>Parecer:</strong> ${e.parecer || '-'}</p>
+        `;
+
+        if (e.valor_proposta) {
+            const vp = 'R$ ' + Number(e.valor_proposta).toLocaleString('pt-BR', {minimumFractionDigits:2});
+            html += `<hr><p><strong>Proposta:</strong> ${vp} | <strong>BDI:</strong> ${(e.bdi_percentual||0).toFixed(2)}% | <strong>Margem:</strong> ${(e.margem_percentual||0).toFixed(1)}%</p>`;
+        }
+
+        if (e.lance_sugerido_min) {
+            const lmin = 'R$ ' + Number(e.lance_sugerido_min).toLocaleString('pt-BR', {minimumFractionDigits:2});
+            const lmax = 'R$ ' + Number(e.lance_sugerido_max).toLocaleString('pt-BR', {minimumFractionDigits:2});
+            html += `<p><strong>Lance sugerido:</strong> ${lmin} a ${lmax}</p>`;
+        }
+
+        if (e.link_edital) {
+            html += `<p><a href="${e.link_edital}" target="_blank" style="color:var(--primary)">Abrir no PNCP</a></p>`;
+        }
+
+        // Acoes
+        html += `<hr><div style="display:flex;gap:0.5rem;flex-wrap:wrap;margin:0.75rem 0">
+            <button class="btn btn-sm" onclick="mudarStatus('${e.pncp_id}','favorito')">Favoritar</button>
+            <button class="btn btn-sm btn-primary" onclick="executarPipeline('${e.pncp_id}')">Pipeline Completo</button>
+            <button class="btn btn-sm btn-danger" onclick="mudarStatus('${e.pncp_id}','descartado')">Descartar</button>
+        </div>`;
+
+        // Comentarios
+        html += `<hr><div class="card-title">Comentarios</div>`;
+        if (e.comentarios && e.comentarios.length > 0) {
+            html += '<div class="timeline">';
+            for (const c of e.comentarios) {
+                html += `<div class="timeline-item">
+                    <div class="meta">${c.autor} - ${c.created_at}</div>
+                    <div class="content">${c.texto}</div>
+                </div>`;
+            }
+            html += '</div>';
+        } else {
+            html += '<p style="color:var(--text2)">Nenhum comentario.</p>';
+        }
+
+        html += `<div class="comment-box">
+            <input type="text" id="novo-comentario" placeholder="Adicionar comentario...">
+            <button class="btn btn-sm btn-primary" onclick="adicionarComentario('${e.pncp_id}')">Enviar</button>
+        </div>`;
+
+        document.getElementById('modal-titulo', e.pncp_id);
+        body.innerHTML = html;
+    } catch(e) {
+        body.innerHTML = '<p style="color:var(--danger)">Erro ao carregar edital.</p>';
+    }
+}
+
+function fecharModal() {
+    document.getElementById('modal-edital').classList.remove('show');
+}
+
+document.getElementById('modal-edital').addEventListener('click', (e) => {
+    if (e.target.classList.contains('modal-overlay')) fecharModal();
+});
+
+// ── Acoes API ─────────────────────────────────────────────
+async function mudarStatus(pncpId, status) {
+    await fetch(API + `/api/editais/${pncpId}/status`, {
+        method: 'PUT',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({status}),
+    });
+    fecharModal();
+    carregarDados();
+}
+
+async function executarPipeline(pncpId) {
+    await fetch(API + `/api/editais/${pncpId}/pipeline`, {method: 'POST'});
+    alert('Pipeline iniciado para ' + pncpId);
+}
+
+async function executarMonitor() {
+    await fetch(API + '/api/monitor/executar', {method: 'POST'});
+    alert('Monitor iniciado!');
+}
+
+async function adicionarComentario(pncpId) {
+    const input = document.getElementById('novo-comentario');
+    const texto = input.value.trim();
+    if (!texto) return;
+
+    await fetch(API + `/api/editais/${pncpId}/comentario`, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({texto, autor: 'Usuario'}),
+    });
+    input.value = '';
+    abrirEdital(pncpId);
+}
+
+// ── Relatorios ────────────────────────────────────────────
+async function carregarRelatorios() {
+    const [ufData, modData, timeData] = await Promise.all([
+        fetch(API + '/api/relatorios/por-uf').then(r => r.json()),
+        fetch(API + '/api/relatorios/por-modalidade').then(r => r.json()),
+        fetch(API + '/api/relatorios/timeline').then(r => r.json()),
+    ]);
+
+    // Chart UF
+    const ctxUf = document.getElementById('chart-uf').getContext('2d');
+    if (window._chartUf) window._chartUf.destroy();
+    window._chartUf = new Chart(ctxUf, {
+        type: 'bar',
+        data: {
+            labels: ufData.slice(0, 10).map(d => d.uf),
+            datasets: [{
+                label: 'Valor Total (R$)',
+                data: ufData.slice(0, 10).map(d => d.valor_total),
+                backgroundColor: '#3b82f6',
+                borderRadius: 4,
+            }]
+        },
+        options: {
+            responsive: true,
+            plugins: { legend: { display: false } },
+            scales: {
+                y: { ticks: { callback: v => 'R$ ' + (v/1e6).toFixed(1) + 'M', color: '#94a3b8' }, grid: { color: '#334155' } },
+                x: { ticks: { color: '#94a3b8' }, grid: { display: false } },
+            }
+        }
+    });
+
+    // Chart Modalidade
+    const ctxMod = document.getElementById('chart-modalidade').getContext('2d');
+    if (window._chartMod) window._chartMod.destroy();
+    const colors = ['#3b82f6','#22c55e','#f59e0b','#ef4444','#a855f7','#06b6d4','#ec4899','#8b5cf6'];
+    window._chartMod = new Chart(ctxMod, {
+        type: 'doughnut',
+        data: {
+            labels: modData.map(d => d.modalidade || 'N/A'),
+            datasets: [{
+                data: modData.map(d => d.total),
+                backgroundColor: colors,
+            }]
+        },
+        options: {
+            responsive: true,
+            plugins: { legend: { position: 'right', labels: { color: '#e2e8f0', font: { size: 11 } } } }
+        }
+    });
+
+    // Chart Timeline
+    const ctxTime = document.getElementById('chart-timeline').getContext('2d');
+    if (window._chartTime) window._chartTime.destroy();
+    const sorted = [...timeData].reverse();
+    window._chartTime = new Chart(ctxTime, {
+        type: 'line',
+        data: {
+            labels: sorted.map(d => d.data),
+            datasets: [{
+                label: 'Editais/dia',
+                data: sorted.map(d => d.total),
+                borderColor: '#3b82f6',
+                backgroundColor: 'rgba(59,130,246,0.1)',
+                fill: true,
+                tension: 0.3,
+            }]
+        },
+        options: {
+            responsive: true,
+            plugins: { legend: { display: false } },
+            scales: {
+                y: { ticks: { color: '#94a3b8' }, grid: { color: '#334155' } },
+                x: { ticks: { color: '#94a3b8', maxTicksLimit: 10 }, grid: { display: false } },
+            }
+        }
+    });
+}
+
+// ── Concorrentes ──────────────────────────────────────────
+async function carregarConcorrentes() {
+    try {
+        const data = await fetch(API + '/api/concorrentes').then(r => r.json());
+        const tbody = document.getElementById('concorrentes-tbody');
+        tbody.innerHTML = data.map(c => {
+            const segs = Array.isArray(c.segmentos) ? c.segmentos.join(', ') : (c.segmentos || '-');
+            const ufs = Array.isArray(c.uf_atuacao) ? c.uf_atuacao.join(', ') : (c.uf_atuacao || '-');
+            return `<tr>
+                <td>${c.nome_fantasia || c.razao_social || '-'}</td>
+                <td>${c.cnpj}</td>
+                <td>${segs}</td>
+                <td>${ufs}</td>
+                <td>${c.notas || '-'}</td>
+            </tr>`;
+        }).join('');
+    } catch(e) { console.error('Erro concorrentes:', e); }
+}
+
+// ── Execucoes ─────────────────────────────────────────────
+async function carregarExecucoes() {
+    try {
+        const data = await fetch(API + '/api/relatorios/execucoes').then(r => r.json());
+        const tbody = document.getElementById('execucoes-tbody');
+        tbody.innerHTML = data.map(e => `<tr>
+            <td>${e.agente}</td>
+            <td>${e.pncp_id || '-'}</td>
+            <td>${e.status}</td>
+            <td>${(e.duracao_seg||0).toFixed(1)}s</td>
+            <td>${e.tokens_usados || '-'}</td>
+            <td>$${(e.custo_estimado||0).toFixed(4)}</td>
+            <td>${e.created_at || '-'}</td>
+        </tr>`).join('');
+    } catch(e) { console.error('Erro execucoes:', e); }
+}
+
+// ── Init ──────────────────────────────────────────────────
+carregarDados();
+</script>
+</body>
+</html>

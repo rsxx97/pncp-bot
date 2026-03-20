@@ -1,0 +1,73 @@
+{
+  "sindicato": "SEAC-RJ",
+  "uf": "RJ",
+  "registro_mte": "RJ001061/2025",
+  "vigencia": {
+    "inicio": "2025-01-01",
+    "fim": "2025-12-31"
+  },
+  "pisos_salariais": {
+    "servente_limpeza": 1698.11,
+    "lider_limpeza": 1953.82,
+    "encarregado_limpeza": 2377.35,
+    "auxiliar_servicos_gerais": 1698.11,
+    "copeira": 1698.11,
+    "recepcionista": 1698.11,
+    "porteiro": 1698.11,
+    "ascensorista": 1698.11,
+    "jardineiro": 1698.11,
+    "auxiliar_manutencao": 1809.41,
+    "zelador": 1698.11,
+    "garcom": 1698.11,
+    "motorista": 2200.00,
+    "office_boy": 1518.00,
+    "auxiliar_administrativo": 1698.11,
+    "tecnico_administrativo": 2100.00
+  },
+  "beneficios": {
+    "vale_transporte": {
+      "desconto_empregado_pct": 6.0,
+      "nota": "Valor real depende do itinerário"
+    },
+    "vale_alimentacao": {
+      "valor_dia": 34.00,
+      "dias_mes": 22,
+      "desconto_empregado_pct": 1.0
+    },
+    "cesta_basica": {
+      "valor_mensal": 183.26,
+      "desconto_empregado": 0.0
+    },
+    "plano_saude": {
+      "valor_mensal": 200.00,
+      "tipo": "coparticipação",
+      "nota": "Opcional conforme edital"
+    },
+    "seguro_vida": {
+      "valor_mensal_por_empregado": 15.00
+    }
+  },
+  "adicionais": {
+    "insalubridade": {
+      "base": "salario_minimo",
+      "grau_minimo_pct": 10.0,
+      "grau_medio_pct": 20.0,
+      "grau_maximo_pct": 40.0
+    },
+    "periculosidade_pct": 30.0,
+    "adicional_noturno_pct": 20.0,
+    "hora_noturna_reduzida": true
+  },
+  "provisoes": {
+    "aviso_previo_trabalhado_dias": 23,
+    "aviso_previo_indenizado_dias": "conforme lei 12506",
+    "multa_fgts_pct": 40.0,
+    "contribuicao_social_rescisoria_pct": 10.0
+  },
+  "jornadas": {
+    "44h_semanais": { "horas_mes": 220, "divisor": 220 },
+    "40h_semanais": { "horas_mes": 200, "divisor": 200 },
+    "36h_semanais": { "horas_mes": 180, "divisor": 180 },
+    "12x36": { "horas_mes": 180, "divisor": 180, "nota": "Escala 12h trabalho x 36h descanso" }
+  }
+}
