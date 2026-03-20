@@ -45,6 +45,37 @@ def init_db():
         CREATE INDEX IF NOT EXISTS idx_valor ON oportunidades(valor_estimado);
         CREATE INDEX IF NOT EXISTS idx_data_pub ON oportunidades(data_publicacao);
         CREATE INDEX IF NOT EXISTS idx_portal ON oportunidades(portal);
+
+        CREATE TABLE IF NOT EXISTS comentarios (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            referencia_id TEXT NOT NULL,
+            tipo TEXT NOT NULL DEFAULT 'anotacao',
+            texto TEXT NOT NULL,
+            autor TEXT DEFAULT 'Eu',
+            nivel TEXT DEFAULT 'normal',
+            criado_em TEXT DEFAULT (datetime('now','localtime'))
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_comentarios_ref ON comentarios(referencia_id);
+
+        CREATE TABLE IF NOT EXISTS acompanhamentos (
+            id TEXT PRIMARY KEY,
+            cnpj TEXT NOT NULL,
+            ano TEXT NOT NULL,
+            sequencial TEXT NOT NULL,
+            orgao TEXT,
+            unidade TEXT,
+            uf TEXT,
+            modalidade TEXT,
+            objeto TEXT,
+            valor_estimado REAL,
+            data_abertura TEXT,
+            data_encerramento TEXT,
+            link TEXT,
+            itens_json TEXT DEFAULT '[]',
+            notas TEXT DEFAULT '',
+            criado_em TEXT DEFAULT (datetime('now','localtime'))
+        );
     """)
     conn.commit()
     conn.close()
@@ -173,6 +204,181 @@ def estatisticas():
     ).fetchall()]
     conn.close()
     return stats
+
+
+def relatorios():
+    conn = get_db()
+    rel = {}
+    # Valor por UF (top 10)
+    rel["valor_por_uf"] = [dict(r) for r in conn.execute(
+        "SELECT uf, SUM(valor_estimado) as valor, COUNT(*) as qtd FROM oportunidades WHERE uf IS NOT NULL GROUP BY uf ORDER BY valor DESC LIMIT 10"
+    ).fetchall()]
+    # Por modalidade
+    rel["por_modalidade"] = [dict(r) for r in conn.execute(
+        "SELECT modalidade_nome, COUNT(*) as qtd, SUM(valor_estimado) as valor FROM oportunidades WHERE modalidade_nome IS NOT NULL GROUP BY modalidade_nome ORDER BY qtd DESC"
+    ).fetchall()]
+    # Por status
+    rel["por_status"] = [dict(r) for r in conn.execute(
+        "SELECT status, COUNT(*) as qtd FROM oportunidades GROUP BY status ORDER BY qtd DESC"
+    ).fetchall()]
+    # Por semana (últimos 60 dias)
+    rel["por_semana"] = [dict(r) for r in conn.execute("""
+        SELECT strftime('%Y-%W', data_publicacao) as semana,
+               COUNT(*) as qtd,
+               SUM(valor_estimado) as valor
+        FROM oportunidades
+        WHERE data_publicacao >= date('now', '-60 days')
+        GROUP BY semana ORDER BY semana
+    """).fetchall()]
+    # Vencendo em 48h
+    rel["vencendo_48h"] = conn.execute("""
+        SELECT COUNT(*) FROM oportunidades
+        WHERE data_encerramento IS NOT NULL
+        AND data_encerramento > datetime('now','localtime')
+        AND data_encerramento <= datetime('now','localtime','+2 days')
+        AND status NOT IN ('ganha','perdida','descartada')
+    """).fetchone()[0]
+    # Vencendo em 7 dias
+    rel["vencendo_7d"] = conn.execute("""
+        SELECT COUNT(*) FROM oportunidades
+        WHERE data_encerramento IS NOT NULL
+        AND data_encerramento > datetime('now','localtime')
+        AND data_encerramento <= datetime('now','localtime','+7 days')
+        AND status NOT IN ('ganha','perdida','descartada')
+    """).fetchone()[0]
+    # Taxa de sucesso
+    total_finalizadas = conn.execute(
+        "SELECT COUNT(*) FROM oportunidades WHERE status IN ('ganha','perdida')"
+    ).fetchone()[0]
+    ganhas = conn.execute(
+        "SELECT COUNT(*) FROM oportunidades WHERE status='ganha'"
+    ).fetchone()[0]
+    rel["taxa_sucesso"] = round((ganhas / total_finalizadas * 100) if total_finalizadas > 0 else 0, 1)
+    rel["total_ganhas"] = ganhas
+    rel["total_finalizadas"] = total_finalizadas
+    conn.close()
+    return rel
+
+
+def inserir_acompanhamento(dados):
+    conn = get_db()
+    try:
+        conn.execute("""
+            INSERT OR REPLACE INTO acompanhamentos
+            (id, cnpj, ano, sequencial, orgao, unidade, uf, modalidade,
+             objeto, valor_estimado, data_abertura, data_encerramento, link, itens_json)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """, (
+            dados["id"], dados["cnpj"], dados["ano"], dados["sequencial"],
+            dados.get("orgao"), dados.get("unidade"), dados.get("uf"),
+            dados.get("modalidade"), dados.get("objeto"),
+            dados.get("valor_estimado"), dados.get("data_abertura"),
+            dados.get("data_encerramento"), dados.get("link"),
+            dados.get("itens_json", "[]"),
+        ))
+        conn.commit()
+        return True
+    finally:
+        conn.close()
+
+
+def listar_acompanhamentos():
+    conn = get_db()
+    rows = conn.execute("SELECT * FROM acompanhamentos ORDER BY criado_em DESC").fetchall()
+    conn.close()
+    return [dict(r) for r in rows]
+
+
+def buscar_acompanhamento(id_acomp):
+    conn = get_db()
+    row = conn.execute("SELECT * FROM acompanhamentos WHERE id=?", (id_acomp,)).fetchone()
+    conn.close()
+    return dict(row) if row else None
+
+
+def remover_acompanhamento(id_acomp):
+    conn = get_db()
+    conn.execute("DELETE FROM acompanhamentos WHERE id=?", (id_acomp,))
+    conn.commit()
+    conn.close()
+
+
+def salvar_notas_acompanhamento(id_acomp, notas):
+    conn = get_db()
+    conn.execute("UPDATE acompanhamentos SET notas=? WHERE id=?", (notas, id_acomp))
+    conn.commit()
+    conn.close()
+
+
+def listar_comentarios(referencia_id):
+    conn = get_db()
+    rows = conn.execute(
+        "SELECT * FROM comentarios WHERE referencia_id=? ORDER BY criado_em ASC",
+        (referencia_id,)
+    ).fetchall()
+    conn.close()
+    return [dict(r) for r in rows]
+
+
+def adicionar_comentario(referencia_id, texto, tipo="anotacao", autor="Eu", nivel="normal"):
+    conn = get_db()
+    conn.execute(
+        "INSERT INTO comentarios (referencia_id, tipo, texto, autor, nivel) VALUES (?, ?, ?, ?, ?)",
+        (referencia_id, tipo, texto, autor, nivel)
+    )
+    conn.commit()
+    conn.close()
+
+
+def remover_comentario(comentario_id):
+    conn = get_db()
+    conn.execute("DELETE FROM comentarios WHERE id=?", (comentario_id,))
+    conn.commit()
+    conn.close()
+
+
+def contar_comentarios(referencia_id):
+    conn = get_db()
+    count = conn.execute(
+        "SELECT COUNT(*) FROM comentarios WHERE referencia_id=?", (referencia_id,)
+    ).fetchone()[0]
+    conn.close()
+    return count
+
+
+def contar_comentarios_batch(ref_ids):
+    if not ref_ids:
+        return {}
+    conn = get_db()
+    placeholders = ",".join("?" for _ in ref_ids)
+    rows = conn.execute(
+        f"SELECT referencia_id, COUNT(*) as qtd FROM comentarios WHERE referencia_id IN ({placeholders}) GROUP BY referencia_id",
+        ref_ids
+    ).fetchall()
+    conn.close()
+    return {r["referencia_id"]: r["qtd"] for r in rows}
+
+
+def contar_nao_lidos_batch(ref_timestamps):
+    """ref_timestamps: dict {ref_id: last_seen_timestamp}"""
+    if not ref_timestamps:
+        return {}
+    conn = get_db()
+    result = {}
+    for ref_id, ts in ref_timestamps.items():
+        if ts:
+            count = conn.execute(
+                "SELECT COUNT(*) FROM comentarios WHERE referencia_id=? AND criado_em > ?",
+                (ref_id, ts)
+            ).fetchone()[0]
+        else:
+            count = conn.execute(
+                "SELECT COUNT(*) FROM comentarios WHERE referencia_id=?",
+                (ref_id,)
+            ).fetchone()[0]
+        result[ref_id] = count
+    conn.close()
+    return result
 
 
 if __name__ == "__main__":

@@ -4,6 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Radar Licitacoes</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+    <script src="https://unpkg.com/jspdf@2.5.2/dist/jspdf.umd.min.js"></script>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { font-family: 'Segoe UI', Tahoma, sans-serif; background: #0f172a; color: #e2e8f0; min-height: 100vh; }
@@ -17,10 +19,19 @@
         .btn-primary:hover { background: #2563eb; }
         .btn-success { background: #10b981; color: white; }
         .btn-success:hover { background: #059669; }
+        .btn-danger { background: #ef4444; color: white; }
+        .btn-danger:hover { background: #dc2626; }
         .btn-warning { background: #f59e0b; color: #0f172a; }
         .btn-sm { padding: 4px 10px; font-size: 12px; }
 
-        .stats-bar { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 15px; padding: 20px 30px; }
+        .tabs { display: flex; gap: 0; padding: 0 30px; background: #1e293b; border-bottom: 1px solid #334155; }
+        .tab { padding: 14px 24px; cursor: pointer; font-size: 14px; font-weight: 600; color: #94a3b8; border-bottom: 3px solid transparent; transition: all 0.2s; }
+        .tab:hover { color: #e2e8f0; }
+        .tab.active { color: #38bdf8; border-bottom-color: #38bdf8; }
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+
+        .stats-bar { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 15px; padding: 20px 30px; }
         .stat-card { background: #1e293b; border-radius: 10px; padding: 16px; border: 1px solid #334155; }
         .stat-card .label { font-size: 12px; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.5px; }
         .stat-card .value { font-size: 28px; font-weight: 700; margin-top: 4px; }
@@ -28,6 +39,9 @@
         .stat-card .value.green { color: #10b981; }
         .stat-card .value.yellow { color: #f59e0b; }
         .stat-card .value.red { color: #ef4444; }
+        .stat-card .value.orange { color: #fb923c; }
+        .stat-card.urgente { border-color: #ef4444; animation: pulse-border 2s infinite; }
+        @keyframes pulse-border { 0%,100% { border-color: #ef4444; } 50% { border-color: #ef444460; } }
 
         .filters { background: #1e293b; margin: 0 30px; padding: 16px 20px; border-radius: 10px; border: 1px solid #334155; display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
         .filters input, .filters select { background: #0f172a; border: 1px solid #475569; color: #e2e8f0; padding: 8px 12px; border-radius: 6px; font-size: 13px; }
@@ -43,6 +57,8 @@
         tbody tr { background: #1e293b; transition: background 0.15s; }
         tbody tr:hover { background: #263348; }
         tbody tr.favorita { border-left: 3px solid #f59e0b; }
+        tbody tr.prazo-urgente { background: #7f1d1d20; }
+        tbody tr.prazo-alerta { background: #78350f15; }
 
         .badge { display: inline-block; padding: 3px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; }
         .badge-blue { background: #1e40af30; color: #60a5fa; }
@@ -50,6 +66,9 @@
         .badge-yellow { background: #b4530030; color: #fbbf24; }
         .badge-red { background: #991b1b30; color: #f87171; }
         .badge-purple { background: #6b21a830; color: #c084fc; }
+        .badge-urgente { background: #ef4444; color: white; animation: pulse-bg 1.5s infinite; font-size: 10px; }
+        .badge-vencendo { background: #f59e0b; color: #0f172a; font-size: 10px; }
+        @keyframes pulse-bg { 0%,100% { opacity: 1; } 50% { opacity: 0.6; } }
 
         .objeto-text { max-width: 350px; line-height: 1.4; }
         .objeto-text .truncated { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
@@ -60,32 +79,124 @@
         .star.inactive { color: #475569; }
 
         .status-select { background: #0f172a; border: 1px solid #475569; color: #e2e8f0; padding: 4px 6px; border-radius: 4px; font-size: 12px; }
-
         .link-btn { color: #38bdf8; text-decoration: none; font-weight: 600; }
         .link-btn:hover { text-decoration: underline; }
-
         .valor { font-weight: 600; color: #10b981; white-space: nowrap; }
-
         .empty-state { text-align: center; padding: 60px 20px; color: #64748b; }
         .empty-state p { font-size: 18px; margin-bottom: 8px; }
-
         .loading { text-align: center; padding: 40px; color: #64748b; }
-
-        .pagination { display: flex; justify-content: center; gap: 8px; padding: 20px; }
-        .pagination button { background: #334155; color: #e2e8f0; border: none; padding: 8px 14px; border-radius: 6px; cursor: pointer; }
-        .pagination button:hover { background: #475569; }
-        .pagination button.active { background: #3b82f6; }
-
         .notas-input { background: #0f172a; border: 1px solid #475569; color: #e2e8f0; padding: 4px 8px; border-radius: 4px; font-size: 12px; width: 150px; }
-
         .portal-badge { font-size: 10px; font-weight: 700; padding: 2px 6px; border-radius: 3px; }
         .portal-PNCP { background: #1d4ed830; color: #60a5fa; }
         .portal-ComprasNet { background: #05966930; color: #34d399; }
+
+        /* Acompanhamento */
+        .acomp-busca { background: #1e293b; margin: 20px 30px; padding: 20px; border-radius: 10px; border: 1px solid #334155; display: flex; gap: 10px; align-items: center; }
+        .acomp-busca input { flex: 1; background: #0f172a; border: 1px solid #475569; color: #e2e8f0; padding: 12px 16px; border-radius: 6px; font-size: 14px; }
+        .acomp-busca input:focus { outline: none; border-color: #3b82f6; }
+        .acomp-busca input::placeholder { color: #64748b; }
+        .acomp-msg { padding: 10px 30px; font-size: 13px; }
+        .acomp-msg.erro { color: #f87171; }
+        .acomp-msg.ok { color: #34d399; }
+        .itens-panel { background: #0f172a; border: 1px solid #334155; border-radius: 8px; margin: 8px 0; padding: 12px; max-height: 400px; overflow-y: auto; }
+        .item-row { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #1e293b; font-size: 12px; }
+        .item-row:last-child { border-bottom: none; }
+        .item-desc { flex: 1; margin-right: 12px; }
+        .item-qtd { color: #94a3b8; min-width: 80px; text-align: right; }
+        .item-valor { color: #10b981; font-weight: 600; min-width: 120px; text-align: right; }
+        .resultado-tag { display: inline-block; background: #10b98130; color: #34d399; padding: 2px 6px; border-radius: 3px; font-size: 10px; margin-top: 4px; }
+
+        /* Relatorios */
+        .charts-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; padding: 20px 30px; }
+        .chart-card { background: #1e293b; border-radius: 10px; padding: 20px; border: 1px solid #334155; }
+        .chart-card h3 { font-size: 14px; color: #94a3b8; margin-bottom: 15px; text-transform: uppercase; letter-spacing: 0.5px; }
+        .chart-card canvas { max-height: 300px; }
+        .resumo-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; padding: 0 30px 20px; }
+        .resumo-card { background: #1e293b; border-radius: 10px; padding: 20px; border: 1px solid #334155; text-align: center; }
+        .resumo-card .big { font-size: 36px; font-weight: 700; }
+        .resumo-card .desc { font-size: 12px; color: #94a3b8; margin-top: 4px; }
+
+        /* Modal Chat */
+        .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); z-index: 1000; justify-content: center; align-items: center; }
+        .modal-overlay.open { display: flex; }
+        .modal { background: #1e293b; border-radius: 12px; border: 1px solid #334155; width: 95%; max-width: 800px; max-height: 90vh; display: flex; flex-direction: column; }
+        .modal-header { padding: 16px 20px; border-bottom: 1px solid #334155; display: flex; justify-content: space-between; align-items: center; }
+        .modal-header h2 { font-size: 16px; color: #38bdf8; }
+        .modal-close { background: none; border: none; color: #94a3b8; font-size: 24px; cursor: pointer; padding: 0 4px; }
+        .modal-close:hover { color: #e2e8f0; }
+        .modal-info { padding: 12px 20px; background: #0f172a; border-bottom: 1px solid #334155; }
+        .modal-info .info-row { display: flex; gap: 20px; flex-wrap: wrap; font-size: 12px; color: #94a3b8; }
+        .modal-info .info-row span { display: flex; align-items: center; gap: 4px; }
+        .modal-info .info-row strong { color: #e2e8f0; }
+        .modal-tabs { display: flex; gap: 0; padding: 0 20px; border-bottom: 1px solid #334155; }
+        .modal-tab { padding: 10px 16px; cursor: pointer; font-size: 13px; font-weight: 600; color: #94a3b8; border-bottom: 2px solid transparent; transition: all 0.2s; }
+        .modal-tab:hover { color: #e2e8f0; }
+        .modal-tab.active { color: #38bdf8; border-bottom-color: #38bdf8; }
+        .modal-tab .count { background: #3b82f6; color: white; font-size: 10px; padding: 1px 6px; border-radius: 10px; margin-left: 6px; }
+        .chat-area { flex: 1; overflow-y: auto; padding: 16px 20px; min-height: 300px; max-height: 50vh; }
+        .chat-msg { margin-bottom: 12px; padding: 10px 14px; border-radius: 8px; background: #0f172a; border: 1px solid #334155; }
+        .chat-msg .msg-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
+        .chat-msg .msg-autor { font-size: 12px; font-weight: 600; color: #38bdf8; }
+        .chat-msg .msg-data { font-size: 11px; color: #64748b; }
+        .chat-msg .msg-texto { font-size: 13px; line-height: 1.5; white-space: pre-wrap; }
+        .chat-msg .msg-nivel { display: inline-block; padding: 2px 6px; border-radius: 3px; font-size: 10px; font-weight: 600; margin-left: 8px; }
+        .chat-msg .msg-del { background: none; border: none; color: #64748b; cursor: pointer; font-size: 11px; }
+        .chat-msg .msg-del:hover { color: #ef4444; }
+        .chat-msg .msg-copy { background: none; border: none; color: #64748b; cursor: pointer; font-size: 11px; }
+        .chat-msg .msg-copy:hover { color: #38bdf8; }
+        .chat-msg .msg-copy.copied { color: #10b981; }
+        .nivel-normal .msg-nivel { display: none; }
+        .nivel-urgente { border-color: #ef4444; }
+        .nivel-urgente .msg-nivel { background: #ef4444; color: white; }
+        .nivel-grave { border-color: #f97316; }
+        .nivel-grave .msg-nivel { background: #f97316; color: white; }
+        .nivel-moderado { border-color: #f59e0b; }
+        .nivel-moderado .msg-nivel { background: #f59e0b; color: #0f172a; }
+        .nivel-aviso { border-color: #3b82f6; }
+        .nivel-aviso .msg-nivel { background: #3b82f6; color: white; }
+        .nivel-item { border-color: #10b981; }
+        .nivel-item .msg-nivel { background: #10b981; color: white; }
+        .chat-empty { text-align: center; color: #64748b; padding: 40px; font-size: 14px; }
+        .chat-input { padding: 12px 20px; border-top: 1px solid #334155; }
+        .chat-input-row { display: flex; gap: 8px; }
+        .chat-input textarea { flex: 1; background: #0f172a; border: 1px solid #475569; color: #e2e8f0; padding: 10px 12px; border-radius: 6px; font-size: 13px; resize: none; height: 60px; font-family: inherit; }
+        .chat-input textarea:focus { outline: none; border-color: #3b82f6; }
+        .chat-input textarea::placeholder { color: #64748b; }
+        .chat-input-opts { display: flex; justify-content: space-between; align-items: center; margin-top: 8px; }
+        .chat-input-opts select { background: #0f172a; border: 1px solid #475569; color: #e2e8f0; padding: 4px 8px; border-radius: 4px; font-size: 12px; }
+        .chat-btn-count { background: #3b82f630; color: #60a5fa; border: none; padding: 4px 10px; border-radius: 4px; font-size: 11px; cursor: pointer; position: relative; }
+        .chat-btn-count .chat-badge { background: #ef4444; color: white; font-size: 9px; font-weight: 700; padding: 1px 5px; border-radius: 10px; margin-left: 4px; min-width: 16px; display: inline-block; text-align: center; }
+        .chat-btn-count .chat-badge.zero { background: #475569; }
+        .chat-btn-count .chat-unread { position: absolute; top: -6px; right: -6px; background: #ef4444; color: white; font-size: 9px; font-weight: 700; padding: 1px 4px; border-radius: 50%; min-width: 14px; text-align: center; animation: pulse-bg 1.5s infinite; }
+
+        /* Split Panel */
+        .split-panel { display: flex; height: calc(100vh - 120px); }
+        .split-left { width: 380px; min-width: 300px; border-right: 1px solid #334155; overflow-y: auto; background: #1e293b; }
+        .split-right { flex: 1; display: flex; flex-direction: column; background: #0f172a; }
+        .split-item { padding: 12px 16px; border-bottom: 1px solid #334155; cursor: pointer; transition: background 0.15s; }
+        .split-item:hover { background: #263348; }
+        .split-item.active { background: #1e40af20; border-left: 3px solid #3b82f6; }
+        .split-item .si-orgao { font-size: 13px; font-weight: 600; color: #e2e8f0; margin-bottom: 2px; }
+        .split-item .si-objeto { font-size: 11px; color: #94a3b8; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+        .split-item .si-meta { display: flex; gap: 8px; margin-top: 6px; font-size: 10px; color: #64748b; }
+        .split-item .si-meta .si-valor { color: #10b981; font-weight: 600; }
+        .split-item .si-unread { background: #ef4444; color: white; font-size: 9px; padding: 1px 5px; border-radius: 10px; float: right; }
+        .split-search { padding: 12px; border-bottom: 1px solid #334155; }
+        .split-search input { width: 100%; background: #0f172a; border: 1px solid #475569; color: #e2e8f0; padding: 8px 12px; border-radius: 6px; font-size: 12px; }
+        .split-empty { display: flex; align-items: center; justify-content: center; height: 100%; color: #64748b; font-size: 14px; }
+        .split-chat-header { padding: 12px 20px; border-bottom: 1px solid #334155; background: #1e293b; }
+        .split-chat-header h3 { font-size: 14px; color: #38bdf8; margin-bottom: 2px; }
+        .split-chat-header small { color: #94a3b8; font-size: 11px; }
 
         @media (max-width: 768px) {
             .filters { flex-direction: column; }
             .filters input[type="text"] { width: 100%; }
             .stats-bar { grid-template-columns: repeat(2, 1fr); }
+            .acomp-busca { flex-direction: column; }
+            .charts-grid { grid-template-columns: 1fr; }
+            .modal { width: 98%; max-height: 95vh; }
+            .split-panel { flex-direction: column; height: auto; }
+            .split-left { width: 100%; max-height: 40vh; border-right: none; border-bottom: 1px solid #334155; }
         }
     </style>
 </head>
@@ -93,75 +204,249 @@
     <div class="header">
         <h1>Radar <span>Licitacoes</span></h1>
         <div class="header-actions">
-            <button class="btn btn-primary" onclick="carregarDados()">Atualizar</button>
+            <button class="btn btn-warning" id="btn-notif" onclick="pedirPermissaoNotif()" title="Ativar notificacoes do navegador">Notificacoes</button>
+            <button class="btn" style="background:#8b5cf6;color:white" onclick="abrirPalavrasChave()">Palavras-chave</button>
+            <select id="polling-select" onchange="iniciarPolling(parseInt(this.value))" style="background:#0f172a;border:1px solid #475569;color:#e2e8f0;padding:6px 8px;border-radius:6px;font-size:12px" title="Auto-refresh">
+                <option value="0">Manual</option>
+                <option value="1">1 min</option>
+                <option value="3">3 min</option>
+                <option value="5" selected>5 min</option>
+                <option value="10">10 min</option>
+                <option value="15">15 min</option>
+            </select>
+            <button class="btn btn-primary" onclick="atualizarAba()">Atualizar</button>
             <button class="btn btn-success" onclick="exportarCSV()">Exportar CSV</button>
         </div>
     </div>
 
-    <div class="stats-bar" id="stats-bar">
-        <div class="stat-card"><div class="label">Total</div><div class="value blue" id="st-total">-</div></div>
-        <div class="stat-card"><div class="label">Novas</div><div class="value green" id="st-novas">-</div></div>
-        <div class="stat-card"><div class="label">Em Analise</div><div class="value yellow" id="st-analise">-</div></div>
-        <div class="stat-card"><div class="label">Favoritas</div><div class="value red" id="st-fav">-</div></div>
-        <div class="stat-card"><div class="label">Valor Total Estimado</div><div class="value green" id="st-valor">-</div></div>
+    <div class="tabs">
+        <div class="tab active" onclick="trocarAba('oportunidades')">Oportunidades</div>
+        <div class="tab" onclick="trocarAba('acompanhamento')">Acompanhamento</div>
+        <div class="tab" onclick="trocarAba('chatpanel')">Chat Panel</div>
+        <div class="tab" onclick="trocarAba('relatorios')">Relatorios</div>
     </div>
 
-    <div class="filters">
-        <input type="text" id="f-busca" placeholder="Buscar no objeto..." oninput="debounce(carregarDados, 400)()">
-        <select id="f-uf" onchange="carregarDados()">
-            <option value="">Todos UFs</option>
-        </select>
-        <select id="f-modalidade" onchange="carregarDados()">
-            <option value="">Todas Modalidades</option>
-        </select>
-        <select id="f-status" onchange="carregarDados()">
-            <option value="">Todos Status</option>
-            <option value="nova">Nova</option>
-            <option value="em_analise">Em Analise</option>
-            <option value="proposta_enviada">Proposta Enviada</option>
-            <option value="ganha">Ganha</option>
-            <option value="perdida">Perdida</option>
-            <option value="descartada">Descartada</option>
-        </select>
-        <select id="f-portal" onchange="carregarDados()">
-            <option value="">Todos Portais</option>
-            <option value="PNCP">PNCP</option>
-            <option value="ComprasNet">ComprasNet</option>
-        </select>
-        <label><input type="checkbox" id="f-fav" onchange="carregarDados()"> Favoritas</label>
-        <input type="date" id="f-data-de" onchange="carregarDados()" title="Data de">
-        <input type="date" id="f-data-ate" onchange="carregarDados()" title="Data ate">
+    <!-- ABA OPORTUNIDADES -->
+    <div id="aba-oportunidades" class="tab-content active">
+        <div class="stats-bar" id="stats-bar">
+            <div class="stat-card"><div class="label">Total</div><div class="value blue" id="st-total">-</div></div>
+            <div class="stat-card"><div class="label">Novas</div><div class="value green" id="st-novas">-</div></div>
+            <div class="stat-card"><div class="label">Em Analise</div><div class="value yellow" id="st-analise">-</div></div>
+            <div class="stat-card"><div class="label">Favoritas</div><div class="value red" id="st-fav">-</div></div>
+            <div class="stat-card"><div class="label">Valor Total</div><div class="value green" id="st-valor">-</div></div>
+            <div class="stat-card" id="card-vencendo"><div class="label">Vencendo 48h</div><div class="value orange" id="st-vencendo">-</div></div>
+        </div>
+
+        <div class="filters">
+            <input type="text" id="f-busca" placeholder="Buscar no objeto..." oninput="debounce(carregarDados, 400)()">
+            <select id="f-uf" onchange="carregarDados()"><option value="">Todos UFs</option></select>
+            <select id="f-modalidade" onchange="carregarDados()"><option value="">Todas Modalidades</option></select>
+            <select id="f-status" onchange="carregarDados()">
+                <option value="">Todos Status</option>
+                <option value="nova">Nova</option>
+                <option value="em_analise">Em Analise</option>
+                <option value="proposta_enviada">Proposta Enviada</option>
+                <option value="ganha">Ganha</option>
+                <option value="perdida">Perdida</option>
+                <option value="descartada">Descartada</option>
+            </select>
+            <select id="f-portal" onchange="carregarDados()">
+                <option value="">Todos Portais</option>
+                <option value="PNCP">PNCP</option>
+                <option value="ComprasNet">ComprasNet</option>
+            </select>
+            <label><input type="checkbox" id="f-fav" onchange="carregarDados()"> Favoritas</label>
+            <input type="date" id="f-data-de" onchange="carregarDados()" title="Data de">
+            <input type="date" id="f-data-ate" onchange="carregarDados()" title="Data ate">
+        </div>
+
+        <div class="content">
+            <div class="table-wrap">
+                <table>
+                    <thead>
+                        <tr>
+                            <th></th><th>Portal</th><th>Modalidade</th><th>UF</th>
+                            <th>Orgao / Unidade</th><th>Objeto</th><th>Valor Estimado</th>
+                            <th>Publicacao</th><th>Encerramento</th><th>Status</th><th>Obs</th><th>Chat</th><th>Link</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tabela-body">
+                        <tr><td colspan="13" class="loading">Carregando...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
     </div>
 
-    <div class="content">
-        <div class="table-wrap">
-            <table>
-                <thead>
-                    <tr>
-                        <th></th>
-                        <th>Portal</th>
-                        <th>Modalidade</th>
-                        <th>UF</th>
-                        <th>Orgao / Unidade</th>
-                        <th>Objeto</th>
-                        <th>Valor Estimado</th>
-                        <th>Publicacao</th>
-                        <th>Encerramento</th>
-                        <th>Status</th>
-                        <th>Notas</th>
-                        <th>Link</th>
-                    </tr>
-                </thead>
-                <tbody id="tabela-body">
-                    <tr><td colspan="12" class="loading">Carregando...</td></tr>
-                </tbody>
-            </table>
+    <!-- ABA ACOMPANHAMENTO -->
+    <div id="aba-acompanhamento" class="tab-content">
+        <div class="acomp-busca">
+            <input type="text" id="acomp-entrada" placeholder="Cole o link do PNCP ou digite CNPJ/ANO/SEQUENCIAL (ex: 00394502000144/2025/14676)" onkeydown="if(event.key==='Enter')buscarAcompanhar()">
+            <button class="btn btn-primary" onclick="buscarAcompanhar()">Buscar e Acompanhar</button>
+        </div>
+        <div id="acomp-msg" class="acomp-msg" style="display:none"></div>
+        <div class="content">
+            <div class="table-wrap">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Modalidade</th><th>UF</th><th>Orgao</th><th>Objeto</th>
+                            <th>Valor Estimado</th><th>Abertura</th><th>Encerramento</th><th>Chat</th><th>Acoes</th>
+                        </tr>
+                    </thead>
+                    <tbody id="acomp-body">
+                        <tr><td colspan="9" class="loading">Carregando...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- ABA CHAT PANEL -->
+    <div id="aba-chatpanel" class="tab-content">
+        <div class="split-panel">
+            <div class="split-left">
+                <div class="split-search">
+                    <input type="text" id="split-busca" placeholder="Filtrar licitacoes..." oninput="renderSplitList()">
+                </div>
+                <div id="split-list"></div>
+            </div>
+            <div class="split-right">
+                <div id="split-chat-placeholder" class="split-empty">Selecione uma licitacao para ver o chat</div>
+                <div id="split-chat-container" style="display:none;flex:1;flex-direction:column">
+                    <div class="split-chat-header" id="split-chat-header">
+                        <h3 id="split-chat-titulo">-</h3>
+                        <small id="split-chat-sub">-</small>
+                    </div>
+                    <div class="modal-tabs" id="split-modal-tabs">
+                        <div class="modal-tab active" data-tab="todas" onclick="trocarModalTab('todas')">Todas <span class="count" id="split-count-todas">0</span></div>
+                        <div class="modal-tab" data-tab="pregoeiro" onclick="trocarModalTab('pregoeiro')">Pregoeiro <span class="count" id="split-count-preg">0</span></div>
+                        <div class="modal-tab" data-tab="anotacoes" onclick="trocarModalTab('anotacoes')">Anotacoes <span class="count" id="split-count-anot">0</span></div>
+                    </div>
+                    <div style="padding:8px 20px;border-bottom:1px solid #334155">
+                        <input type="text" id="split-chat-busca" placeholder="Buscar nas mensagens..." oninput="renderComentarios()" style="width:100%;background:#0f172a;border:1px solid #475569;color:#e2e8f0;padding:6px 10px;border-radius:6px;font-size:12px">
+                    </div>
+                    <div class="chat-area" id="split-chat-area" style="flex:1;min-height:200px"></div>
+                    <div class="chat-input">
+                        <div class="chat-input-row">
+                            <textarea id="split-chat-texto" placeholder="Escreva uma mensagem..." style="flex:1;background:#0f172a;border:1px solid #475569;color:#e2e8f0;padding:10px 12px;border-radius:6px;font-size:13px;resize:none;height:60px;font-family:inherit"></textarea>
+                            <button class="btn btn-primary" onclick="enviarComentarioSplit()" style="align-self:flex-end">Enviar</button>
+                        </div>
+                        <div class="chat-input-opts">
+                            <div style="display:flex;gap:8px;align-items:center">
+                                <select id="split-chat-tipo">
+                                    <option value="anotacao">Anotacao</option>
+                                    <option value="mensagem_pregoeiro">Msg Pregoeiro</option>
+                                    <option value="mensagem_sistema">Msg Sistema</option>
+                                </select>
+                                <select id="split-chat-nivel">
+                                    <option value="normal">Normal</option>
+                                    <option value="item">Item</option>
+                                    <option value="aviso">Aviso</option>
+                                    <option value="moderado">Moderado</option>
+                                    <option value="grave">Grave</option>
+                                    <option value="urgente">Urgente</option>
+                                </select>
+                            </div>
+                            <small style="color:#64748b">Ctrl+Enter para enviar</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ABA RELATORIOS -->
+    <div id="aba-relatorios" class="tab-content">
+        <div class="resumo-grid" id="resumo-grid" style="padding-top:20px">
+            <div class="resumo-card"><div class="big blue" id="rel-total">-</div><div class="desc">Total de Oportunidades</div></div>
+            <div class="resumo-card"><div class="big green" id="rel-valor">-</div><div class="desc">Valor Total Estimado</div></div>
+            <div class="resumo-card"><div class="big yellow" id="rel-vencendo">-</div><div class="desc">Vencendo em 7 dias</div></div>
+            <div class="resumo-card"><div class="big" style="color:#10b981" id="rel-sucesso">-</div><div class="desc">Taxa de Sucesso</div></div>
+        </div>
+        <div class="charts-grid">
+            <div class="chart-card"><h3>Valor por UF</h3><canvas id="chart-uf"></canvas></div>
+            <div class="chart-card"><h3>Por Modalidade</h3><canvas id="chart-modalidade"></canvas></div>
+            <div class="chart-card"><h3>Oportunidades por Semana</h3><canvas id="chart-semana"></canvas></div>
+            <div class="chart-card"><h3>Por Status</h3><canvas id="chart-status"></canvas></div>
+        </div>
+    </div>
+
+    <!-- MODAL DETALHES / CHAT -->
+    <div class="modal-overlay" id="modal-overlay" onclick="if(event.target===this)fecharModal()">
+        <div class="modal">
+            <div class="modal-header">
+                <h2 id="modal-titulo">Detalhes da Licitacao</h2>
+                <div style="display:flex;gap:8px;align-items:center">
+                    <button class="btn btn-sm" style="background:#8b5cf6;color:white" onclick="exportarChatPDF()">PDF</button>
+                    <button class="modal-close" onclick="fecharModal()">&times;</button>
+                </div>
+            </div>
+            <div class="modal-info">
+                <div class="info-row" id="modal-info-row"></div>
+            </div>
+            <div class="modal-tabs">
+                <div class="modal-tab active" data-tab="todas" onclick="trocarModalTab('todas')">Todas <span class="count" id="modal-count-todas">0</span></div>
+                <div class="modal-tab" data-tab="pregoeiro" onclick="trocarModalTab('pregoeiro')">Pregoeiro <span class="count" id="modal-count-preg">0</span></div>
+                <div class="modal-tab" data-tab="anotacoes" onclick="trocarModalTab('anotacoes')">Anotacoes <span class="count" id="modal-count-anot">0</span></div>
+            </div>
+            <div style="padding:8px 20px;border-bottom:1px solid #334155">
+                <input type="text" id="chat-busca" placeholder="Buscar nas mensagens..." oninput="renderComentarios()" style="width:100%;background:#0f172a;border:1px solid #475569;color:#e2e8f0;padding:6px 10px;border-radius:6px;font-size:12px">
+            </div>
+            <div class="chat-area" id="chat-area">
+                <div class="chat-empty">Nenhuma mensagem ainda</div>
+            </div>
+            <div class="chat-input">
+                <div class="chat-input-row">
+                    <textarea id="chat-texto" placeholder="Escreva uma mensagem ou cole texto do pregoeiro..."></textarea>
+                    <button class="btn btn-primary" onclick="enviarComentario()" style="align-self:flex-end">Enviar</button>
+                </div>
+                <div class="chat-input-opts">
+                    <div style="display:flex;gap:8px;align-items:center">
+                        <select id="chat-tipo">
+                            <option value="anotacao">Anotacao</option>
+                            <option value="mensagem_pregoeiro">Msg Pregoeiro</option>
+                            <option value="mensagem_sistema">Msg Sistema</option>
+                        </select>
+                        <select id="chat-nivel">
+                            <option value="normal">Normal</option>
+                            <option value="item">Item</option>
+                            <option value="aviso">Aviso</option>
+                            <option value="moderado">Moderado</option>
+                            <option value="grave">Grave</option>
+                            <option value="urgente">Urgente</option>
+                        </select>
+                    </div>
+                    <small style="color:#64748b">Ctrl+Enter para enviar</small>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL PALAVRAS-CHAVE -->
+    <div class="modal-overlay" id="modal-palavras" onclick="if(event.target===this)fecharPalavrasChave()">
+        <div class="modal" style="max-width:500px">
+            <div class="modal-header">
+                <h2>Palavras-chave Monitoradas</h2>
+                <button class="modal-close" onclick="fecharPalavrasChave()">&times;</button>
+            </div>
+            <div style="padding:16px 20px">
+                <p style="font-size:12px;color:#94a3b8;margin-bottom:12px">Quando uma oportunidade contiver alguma dessas palavras, voce sera alertado.</p>
+                <div style="display:flex;gap:8px;margin-bottom:16px">
+                    <input type="text" id="nova-palavra" placeholder="Nova palavra-chave..." style="flex:1;background:#0f172a;border:1px solid #475569;color:#e2e8f0;padding:8px 12px;border-radius:6px;font-size:13px" onkeydown="if(event.key==='Enter')adicionarPalavra()">
+                    <button class="btn btn-primary" onclick="adicionarPalavra()">Adicionar</button>
+                </div>
+                <div id="lista-palavras" style="display:flex;flex-wrap:wrap;gap:8px"></div>
+            </div>
         </div>
     </div>
 
 <script>
 let dadosAtuais = [];
+let acompDados = [];
+let abaAtual = 'oportunidades';
 let _debounceTimers = {};
+let charts = {};
 
 function debounce(fn, ms) {
     return function() {
@@ -175,6 +460,14 @@ function formatarValor(v) {
     return 'R$ ' + Number(v).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2});
 }
 
+function formatarValorCurto(v) {
+    if (!v) return 'R$ 0';
+    if (v >= 1e9) return 'R$ ' + (v/1e9).toFixed(1) + 'B';
+    if (v >= 1e6) return 'R$ ' + (v/1e6).toFixed(1) + 'M';
+    if (v >= 1e3) return 'R$ ' + (v/1e3).toFixed(0) + 'K';
+    return 'R$ ' + v.toFixed(0);
+}
+
 function formatarData(d) {
     if (!d) return 'N/I';
     try {
@@ -183,32 +476,61 @@ function formatarData(d) {
     } catch(e) { return d; }
 }
 
-function badgeStatus(s) {
-    const cores = {nova:'blue', em_analise:'yellow', proposta_enviada:'purple', ganha:'green', perdida:'red', descartada:'red'};
-    const nomes = {nova:'Nova', em_analise:'Em Analise', proposta_enviada:'Proposta Enviada', ganha:'Ganha', perdida:'Perdida', descartada:'Descartada'};
-    return `<span class="badge badge-${cores[s]||'blue'}">${nomes[s]||s}</span>`;
+function prazoInfo(dataEnc, status) {
+    if (!dataEnc || ['ganha','perdida','descartada'].includes(status)) return {classe:'', badge:''};
+    try {
+        const enc = new Date(dataEnc);
+        const agora = new Date();
+        const diff = (enc - agora) / (1000*60*60);
+        if (diff < 0) return {classe:'', badge:''};
+        if (diff <= 48) return {classe:'prazo-urgente', badge:'<span class="badge badge-urgente">URGENTE</span> '};
+        if (diff <= 168) return {classe:'prazo-alerta', badge:'<span class="badge badge-vencendo">VENCENDO</span> '};
+    } catch(e) {}
+    return {classe:'', badge:''};
 }
+
+const abasMap = {oportunidades:0, acompanhamento:1, chatpanel:2, relatorios:3};
+
+function trocarAba(aba) {
+    abaAtual = aba;
+    document.querySelectorAll('.tab').forEach((t,i) => t.classList.toggle('active', i===abasMap[aba]));
+    ['oportunidades','acompanhamento','chatpanel','relatorios'].forEach(a => {
+        document.getElementById('aba-'+a).classList.toggle('active', a===aba);
+    });
+    if (aba === 'acompanhamento') carregarAcompanhamentos();
+    if (aba === 'relatorios') carregarRelatorios();
+    if (aba === 'chatpanel') carregarSplitPanel();
+}
+
+function atualizarAba() {
+    if (abaAtual === 'oportunidades') carregarDados();
+    else if (abaAtual === 'acompanhamento') carregarAcompanhamentos();
+    else carregarRelatorios();
+}
+
+// ── OPORTUNIDADES ──
 
 async function carregarEstatisticas() {
     try {
-        const r = await fetch('/api/estatisticas');
-        const s = await r.json();
+        const [sr, rr] = await Promise.all([fetch('/api/estatisticas'), fetch('/api/relatorios')]);
+        const s = await sr.json();
+        const rel = await rr.json();
         document.getElementById('st-total').textContent = s.total;
         document.getElementById('st-novas').textContent = s.novas;
         document.getElementById('st-analise').textContent = s.em_analise;
         document.getElementById('st-fav').textContent = s.favoritas;
-        document.getElementById('st-valor').textContent = formatarValor(s.valor_total);
+        document.getElementById('st-valor').textContent = formatarValorCurto(s.valor_total);
+        document.getElementById('st-vencendo').textContent = rel.vencendo_48h;
 
-        // Preencher filtro UF
+        const card = document.getElementById('card-vencendo');
+        card.classList.toggle('urgente', rel.vencendo_48h > 0);
+
         const ufSel = document.getElementById('f-uf');
         const ufAtual = ufSel.value;
         ufSel.innerHTML = '<option value="">Todos UFs</option>';
-        (s.por_uf || []).forEach(u => {
-            ufSel.innerHTML += `<option value="${u.uf}">${u.uf} (${u.qtd})</option>`;
-        });
+        (s.por_uf || []).forEach(u => ufSel.innerHTML += `<option value="${u.uf}">${u.uf} (${u.qtd})</option>`);
         ufSel.value = ufAtual;
 
-        // Preencher filtro modalidade
         const modSel = document.getElementById('f-modalidade');
         const modAtual = modSel.value;
         modSel.innerHTML = '<option value="">Todas Modalidades</option>';
@@ -242,29 +564,32 @@ async function carregarDados() {
         dadosAtuais = await r.json();
         renderTabela(dadosAtuais);
         carregarEstatisticas();
+        verificarNotificacoes(dadosAtuais);
     } catch(e) {
-        document.getElementById('tabela-body').innerHTML = '<tr><td colspan="12" class="empty-state"><p>Erro ao carregar dados</p></td></tr>';
+        document.getElementById('tabela-body').innerHTML = '<tr><td colspan="13" class="empty-state"><p>Erro ao carregar dados</p></td></tr>';
     }
 }
 
 function renderTabela(dados) {
     const tbody = document.getElementById('tabela-body');
     if (!dados.length) {
-        tbody.innerHTML = '<tr><td colspan="12" class="empty-state"><p>Nenhuma oportunidade encontrada</p><p>Execute o bot para buscar novas licitacoes</p></td></tr>';
+        tbody.innerHTML = '<tr><td colspan="13" class="empty-state"><p>Nenhuma oportunidade encontrada</p><p>Execute o bot para buscar novas licitacoes</p></td></tr>';
         return;
     }
 
-    tbody.innerHTML = dados.map(op => `
-        <tr class="${op.favorito ? 'favorita' : ''}">
+    tbody.innerHTML = dados.map(op => {
+        const p = prazoInfo(op.data_encerramento, op.status);
+        return `
+        <tr class="${op.favorito ? 'favorita' : ''} ${p.classe}">
             <td><span class="star ${op.favorito ? 'active' : 'inactive'}" onclick="toggleFav('${op.id}')">&#9733;</span></td>
-            <td><span class="portal-badge portal-${op.portal}">${op.portal}</span></td>
+            <td><span class="portal-badge portal-${op.portal}">${op.portal}</span>${op.enviado_telegram ? ' <span title="Enviado no Telegram" style="cursor:help">✈️</span>' : ''}</td>
             <td><span class="badge badge-blue">${op.modalidade_nome || 'N/I'}</span></td>
             <td><strong>${op.uf || 'N/I'}</strong></td>
             <td><strong>${op.orgao || ''}</strong><br><small style="color:#94a3b8">${op.unidade || ''}</small></td>
             <td class="objeto-text"><div class="truncated" title="${(op.objeto||'').replace(/"/g,'&quot;')}">${op.objeto || 'Sem descricao'}</div></td>
             <td class="valor">${formatarValor(op.valor_estimado)}</td>
             <td>${formatarData(op.data_publicacao)}</td>
-            <td>${formatarData(op.data_encerramento)}</td>
+            <td>${p.badge}${formatarData(op.data_encerramento)}</td>
             <td>
                 <select class="status-select" onchange="mudarStatus('${op.id}', this.value)">
                     <option value="nova" ${op.status==='nova'?'selected':''}>Nova</option>
@@ -275,25 +600,73 @@ function renderTabela(dados) {
                     <option value="descartada" ${op.status==='descartada'?'selected':''}>Descartada</option>
                 </select>
             </td>
-            <td><input class="notas-input" value="${(op.notas||'').replace(/"/g,'&quot;')}" onblur="salvarNotas('${op.id}', this.value)" placeholder="Anotacoes..."></td>
+            <td>
+                <input class="notas-input" value="${(op.notas||'').replace(/"/g,'&quot;')}" placeholder="..." onchange="salvarNotas('${op.id}', this.value)" title="${(op.notas||'').replace(/"/g,'&quot;')}">
+            </td>
+            <td>
+                <button class="chat-btn-count" id="chat-btn-${op.id.replace(/[^a-zA-Z0-9]/g,'_')}" onclick="abrirModalOp('${op.id}', '${(op.objeto||'').substring(0,60).replace(/'/g,"\\'")}', '${op.uf||''}', '${(op.orgao||'').replace(/'/g,"\\'")}')">Chat <span class="chat-badge zero">0</span></button>
+            </td>
             <td>${op.link && op.link !== 'Nao disponivel' ? `<a class="link-btn" href="${op.link}" target="_blank">Abrir</a>` : 'N/D'}</td>
-        </tr>
-    `).join('');
+        </tr>`;
+    }).join('');
+    atualizarBadgesChat(dados.map(op => op.id));
 }
 
-async function toggleFav(id) {
-    await fetch(`/api/oportunidades/${id}/favorito`, {method:'POST'});
-    carregarDados();
+function getLastSeen(refId) {
+    try { return JSON.parse(localStorage.getItem('chatLastSeen') || '{}')[refId] || null; } catch(e) { return null; }
 }
 
-async function mudarStatus(id, status) {
-    await fetch(`/api/oportunidades/${id}/status`, {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({status})});
-    carregarEstatisticas();
+function setLastSeen(refId) {
+    try {
+        const data = JSON.parse(localStorage.getItem('chatLastSeen') || '{}');
+        data[refId] = new Date().toISOString().replace('T',' ').substring(0,19);
+        localStorage.setItem('chatLastSeen', JSON.stringify(data));
+    } catch(e) {}
 }
 
-async function salvarNotas(id, notas) {
-    await fetch(`/api/oportunidades/${id}/notas`, {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({notas})});
+async function atualizarBadgesChat(ids) {
+    if (!ids.length) return;
+    try {
+        const lastSeenData = JSON.parse(localStorage.getItem('chatLastSeen') || '{}');
+        const refs = {};
+        ids.forEach(id => { refs[id] = lastSeenData[id] || null; });
+        const [rTotal, rNaoLido] = await Promise.all([
+            fetch('/api/comentarios/contar-batch', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ids})}),
+            fetch('/api/comentarios/nao-lidos', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({refs})})
+        ]);
+        const contagens = await rTotal.json();
+        const naoLidos = await rNaoLido.json();
+        ids.forEach(id => {
+            const safeId = id.replace(/[^a-zA-Z0-9]/g, '_');
+            const btn = document.getElementById('chat-btn-' + safeId);
+            if (btn) {
+                const total = contagens[id] || 0;
+                const unread = naoLidos[id] || 0;
+                const badge = btn.querySelector('.chat-badge');
+                if (badge) {
+                    badge.textContent = total;
+                    badge.className = 'chat-badge' + (total === 0 ? ' zero' : '');
+                }
+                // Badge de não-lidos
+                let unreadBadge = btn.querySelector('.chat-unread');
+                if (unread > 0) {
+                    if (!unreadBadge) {
+                        unreadBadge = document.createElement('span');
+                        unreadBadge.className = 'chat-unread';
+                        btn.appendChild(unreadBadge);
+                    }
+                    unreadBadge.textContent = unread;
+                } else if (unreadBadge) {
+                    unreadBadge.remove();
+                }
+            }
+        });
+    } catch(e) { console.error('Erro contagens chat:', e); }
 }
+
+async function toggleFav(id) { await fetch(`/api/oportunidades/${id}/favorito`, {method:'POST'}); carregarDados(); }
+async function mudarStatus(id, status) { await fetch(`/api/oportunidades/${id}/status`, {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({status})}); carregarEstatisticas(); }
+async function salvarNotas(id, notas) { await fetch(`/api/oportunidades/${id}/notas`, {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({notas})}); }
 
 function exportarCSV() {
     if (!dadosAtuais.length) return alert('Nenhum dado para exportar');
@@ -312,7 +685,689 @@ function exportarCSV() {
     a.click();
 }
 
+// ── RELATORIOS ──
+
+const chartColors = ['#3b82f6','#10b981','#f59e0b','#ef4444','#8b5cf6','#ec4899','#06b6d4','#84cc16','#f97316','#6366f1'];
+
+function criarOuAtualizar(id, type, data, options) {
+    if (charts[id]) charts[id].destroy();
+    const ctx = document.getElementById(id).getContext('2d');
+    charts[id] = new Chart(ctx, {type, data, options: {
+        ...options,
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {...(options?.plugins || {}), legend: {labels: {color: '#94a3b8', font: {size: 11}}, ...(options?.plugins?.legend || {})}},
+        scales: type === 'pie' || type === 'doughnut' ? undefined : {
+            x: {ticks: {color: '#64748b', font: {size: 10}}, grid: {color: '#334155'}},
+            y: {ticks: {color: '#64748b', font: {size: 10}}, grid: {color: '#334155'}},
+            ...(options?.scales || {})
+        }
+    }});
+}
+
+async function carregarRelatorios() {
+    try {
+        const [sr, rr] = await Promise.all([fetch('/api/estatisticas'), fetch('/api/relatorios')]);
+        const stats = await sr.json();
+        const rel = await rr.json();
+
+        document.getElementById('rel-total').textContent = stats.total;
+        document.getElementById('rel-valor').textContent = formatarValorCurto(stats.valor_total);
+        document.getElementById('rel-vencendo').textContent = rel.vencendo_7d;
+        document.getElementById('rel-sucesso').textContent = rel.taxa_sucesso + '%';
+
+        // Valor por UF
+        criarOuAtualizar('chart-uf', 'bar', {
+            labels: rel.valor_por_uf.map(u => u.uf),
+            datasets: [{label: 'Valor (R$)', data: rel.valor_por_uf.map(u => u.valor), backgroundColor: chartColors}]
+        }, {plugins: {legend: {display: false}}, scales: {y: {ticks: {callback: v => formatarValorCurto(v), color: '#64748b'}}}});
+
+        // Por modalidade (pizza)
+        criarOuAtualizar('chart-modalidade', 'doughnut', {
+            labels: rel.por_modalidade.map(m => m.modalidade_nome),
+            datasets: [{data: rel.por_modalidade.map(m => m.qtd), backgroundColor: chartColors}]
+        }, {plugins: {legend: {position: 'bottom'}}});
+
+        // Por semana (linha)
+        criarOuAtualizar('chart-semana', 'line', {
+            labels: rel.por_semana.map(s => s.semana),
+            datasets: [{label: 'Oportunidades', data: rel.por_semana.map(s => s.qtd), borderColor: '#3b82f6', backgroundColor: '#3b82f620', fill: true, tension: 0.3}]
+        }, {plugins: {legend: {display: false}}});
+
+        // Por status (pizza)
+        const statusNomes = {nova:'Nova', em_analise:'Em Analise', proposta_enviada:'Proposta Enviada', ganha:'Ganha', perdida:'Perdida', descartada:'Descartada'};
+        criarOuAtualizar('chart-status', 'doughnut', {
+            labels: rel.por_status.map(s => statusNomes[s.status] || s.status),
+            datasets: [{data: rel.por_status.map(s => s.qtd), backgroundColor: chartColors}]
+        }, {plugins: {legend: {position: 'bottom'}}});
+
+    } catch(e) { console.error('Erro relatorios:', e); }
+}
+
+// ── ACOMPANHAMENTO ──
+
+function mostrarMsg(texto, tipo) {
+    const el = document.getElementById('acomp-msg');
+    el.textContent = texto;
+    el.className = 'acomp-msg ' + tipo;
+    el.style.display = 'block';
+    setTimeout(() => el.style.display = 'none', 5000);
+}
+
+async function buscarAcompanhar() {
+    const entrada = document.getElementById('acomp-entrada').value.trim();
+    if (!entrada) return mostrarMsg('Digite o link ou CNPJ/ANO/SEQUENCIAL', 'erro');
+
+    const btn = event.target;
+    btn.disabled = true;
+    btn.textContent = 'Buscando...';
+
+    try {
+        const r = await fetch('/api/acompanhar', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({entrada})});
+        const data = await r.json();
+        if (!r.ok) { mostrarMsg(data.erro || 'Erro ao buscar', 'erro'); }
+        else { mostrarMsg('Licitacao adicionada ao acompanhamento!', 'ok'); document.getElementById('acomp-entrada').value = ''; carregarAcompanhamentos(); }
+    } catch(e) { mostrarMsg('Erro de conexao', 'erro'); }
+    finally { btn.disabled = false; btn.textContent = 'Buscar e Acompanhar'; }
+}
+
+async function carregarAcompanhamentos() {
+    try {
+        const r = await fetch('/api/acompanhamentos');
+        acompDados = await r.json();
+        renderAcompanhamentos(acompDados);
+    } catch(e) {
+        document.getElementById('acomp-body').innerHTML = '<tr><td colspan="9" class="empty-state"><p>Erro ao carregar</p></td></tr>';
+    }
+}
+
+function renderAcompanhamentos(dados) {
+    const tbody = document.getElementById('acomp-body');
+    if (!dados.length) {
+        tbody.innerHTML = '<tr><td colspan="9" class="empty-state"><p>Nenhuma licitacao em acompanhamento</p><p>Cole um link do PNCP acima para comecar</p></td></tr>';
+        return;
+    }
+    tbody.innerHTML = dados.map(a => `
+        <tr>
+            <td><span class="badge badge-blue">${a.modalidade || 'N/I'}</span></td>
+            <td><strong>${a.uf || 'N/I'}</strong></td>
+            <td><strong>${a.orgao || ''}</strong><br><small style="color:#94a3b8">${a.unidade || ''}</small></td>
+            <td class="objeto-text"><div class="truncated" title="${(a.objeto||'').replace(/"/g,'&quot;')}">${a.objeto || 'Sem descricao'}</div></td>
+            <td class="valor">${formatarValor(a.valor_estimado)}</td>
+            <td>${formatarData(a.data_abertura)}</td>
+            <td>${formatarData(a.data_encerramento)}</td>
+            <td>
+                <button class="chat-btn-count" id="chat-btn-${a.id.replace(/[^a-zA-Z0-9]/g,'_')}" onclick="abrirModalAcomp('${a.id}', '${(a.objeto||'').substring(0,60).replace(/'/g,"\\'")}', '${a.uf||''}', '${(a.orgao||'').replace(/'/g,"\\'")}')">Chat <span class="chat-badge zero">0</span></button>
+            </td>
+            <td style="white-space:nowrap">
+                <button class="btn btn-primary btn-sm" onclick="verDetalhes('${a.id}')">Itens</button>
+                <a class="btn btn-success btn-sm" href="${a.link}" target="_blank" style="text-decoration:none;color:white">Abrir</a>
+                <button class="btn btn-danger btn-sm" onclick="removerAcomp('${a.id}')">X</button>
+            </td>
+        </tr>
+        <tr id="detalhes-${a.id.replace(/[^a-zA-Z0-9]/g,'_')}" style="display:none">
+            <td colspan="9" id="detalhes-conteudo-${a.id.replace(/[^a-zA-Z0-9]/g,'_')}"></td>
+        </tr>
+    `).join('');
+    atualizarBadgesChat(dados.map(a => a.id));
+}
+
+async function verDetalhes(id) {
+    const safeId = id.replace(/[^a-zA-Z0-9]/g, '_');
+    const row = document.getElementById('detalhes-' + safeId);
+    const conteudo = document.getElementById('detalhes-conteudo-' + safeId);
+    if (row.style.display !== 'none') { row.style.display = 'none'; return; }
+    conteudo.innerHTML = '<div class="loading">Carregando itens...</div>';
+    row.style.display = '';
+    try {
+        const r = await fetch(`/api/acompanhamentos/${id}/detalhes`);
+        const data = await r.json();
+        const itens = data.itens || [];
+        if (!itens.length) { conteudo.innerHTML = '<div class="itens-panel"><p style="color:#94a3b8">Nenhum item encontrado</p></div>'; return; }
+        let html = '<div class="itens-panel">';
+        html += `<div style="margin-bottom:10px;font-weight:600;color:#38bdf8">${itens.length} item(ns)</div>`;
+        itens.forEach((item, i) => {
+            const desc = item.descricao || item.descricaoItem || item.materialOuServico || 'Sem descricao';
+            const qtd = item.quantidade || item.quantidadeHomologada || '-';
+            const unid = item.unidadeMedida || '';
+            const valor = item.valorUnitarioEstimado || item.valorTotal || null;
+            html += `<div class="item-row"><div class="item-desc"><strong>#${item.numeroItem || (i+1)}</strong> ${desc}</div><div class="item-qtd">${qtd} ${unid}</div><div class="item-valor">${valor ? formatarValor(valor) : 'N/I'}</div></div>`;
+            if (item.resultados && item.resultados.length) {
+                item.resultados.forEach(res => {
+                    const fornecedor = res.nomeRazaoSocialFornecedor || res.niFornecedor || '';
+                    const valorRes = res.valorTotalHomologado || res.valorUnitarioHomologado || null;
+                    html += `<div style="padding:4px 0 8px 20px"><span class="resultado-tag">Resultado: ${fornecedor} ${valorRes ? '- ' + formatarValor(valorRes) : ''}</span></div>`;
+                });
+            }
+        });
+        html += '</div>';
+        conteudo.innerHTML = html;
+    } catch(e) { conteudo.innerHTML = '<div class="itens-panel"><p style="color:#f87171">Erro ao carregar detalhes</p></div>'; }
+}
+
+async function salvarNotasAcomp(id, notas) { await fetch(`/api/acompanhamentos/${id}/notas`, {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({notas})}); }
+async function removerAcomp(id) { if (!confirm('Remover esta licitacao do acompanhamento?')) return; await fetch(`/api/acompanhamentos/${id}`, {method:'DELETE'}); carregarAcompanhamentos(); }
+
+// ── MODAL CHAT ──
+
+function abrirModalOp(id, objeto, uf, orgao) {
+    const info = `<span><strong>UF:</strong> ${uf}</span><span><strong>Orgao:</strong> ${orgao}</span>`;
+    abrirModal(id, objeto || 'Licitacao', info);
+}
+
+function abrirModalAcomp(id, objeto, uf, orgao) {
+    const info = `<span><strong>UF:</strong> ${uf}</span><span><strong>Orgao:</strong> ${orgao}</span><span><strong>ID:</strong> ${id}</span>`;
+    abrirModal(id, objeto || 'Acompanhamento', info);
+}
+
+let modalRefId = null;
+let modalTabAtual = 'todas';
+let modalComentarios = [];
+
+function abrirModal(refId, titulo, info) {
+    modalRefId = refId;
+    modalTabAtual = 'todas';
+    document.getElementById('modal-titulo').textContent = titulo || 'Detalhes';
+    document.getElementById('modal-info-row').innerHTML = info || '';
+    document.getElementById('modal-overlay').classList.add('open');
+    document.querySelectorAll('.modal-tab').forEach((t,i) => t.classList.toggle('active', i===0));
+    document.getElementById('chat-texto').value = '';
+    document.getElementById('chat-busca').value = '';
+    setLastSeen(refId);
+    carregarComentarios();
+    atualizarBadgesChat([refId]);
+}
+
+function fecharModal() {
+    document.getElementById('modal-overlay').classList.remove('open');
+    modalRefId = null;
+}
+
+function trocarModalTab(tab) {
+    modalTabAtual = tab;
+    document.querySelectorAll('.modal-tab').forEach(t => t.classList.toggle('active', t.dataset.tab === tab));
+    renderComentarios();
+}
+
+async function carregarComentarios() {
+    if (!modalRefId) return;
+    try {
+        const r = await fetch(`/api/comentarios/${modalRefId}`);
+        modalComentarios = await r.json();
+        renderComentarios();
+    } catch(e) { console.error('Erro comentarios:', e); }
+}
+
+function renderComentarios() {
+    const area = document.getElementById('chat-area');
+    let filtrados = modalComentarios;
+    if (modalTabAtual === 'anotacoes') {
+        filtrados = modalComentarios.filter(c => c.tipo === 'anotacao');
+    } else if (modalTabAtual === 'pregoeiro') {
+        filtrados = modalComentarios.filter(c => c.tipo === 'mensagem_pregoeiro' || c.tipo === 'mensagem_sistema');
+    }
+
+    const buscaTermo = (document.getElementById('chat-busca')?.value || '').toLowerCase().trim();
+    if (buscaTermo) {
+        filtrados = filtrados.filter(c => c.texto.toLowerCase().includes(buscaTermo) || (c.autor||'').toLowerCase().includes(buscaTermo));
+    }
+
+    const countTodas = modalComentarios.length;
+    const countPreg = modalComentarios.filter(c => c.tipo === 'mensagem_pregoeiro' || c.tipo === 'mensagem_sistema').length;
+    const countAnot = modalComentarios.filter(c => c.tipo === 'anotacao').length;
+    document.getElementById('modal-count-todas').textContent = countTodas;
+    document.getElementById('modal-count-preg').textContent = countPreg;
+    document.getElementById('modal-count-anot').textContent = countAnot;
+
+    if (!filtrados.length) {
+        area.innerHTML = '<div class="chat-empty">Nenhuma mensagem ainda.<br>Cole aqui as mensagens do pregoeiro para manter historico.</div>';
+        return;
+    }
+
+    const nivelNomes = {normal:'Normal', item:'Item', aviso:'Aviso', moderado:'Moderado', grave:'Grave', urgente:'Urgente'};
+    const tipoIcons = {anotacao:'&#128221;', mensagem_pregoeiro:'&#128227;', mensagem_sistema:'&#9881;'};
+    const tipoNomes = {anotacao:'Anotacao', mensagem_pregoeiro:'Pregoeiro', mensagem_sistema:'Sistema'};
+
+    area.innerHTML = filtrados.map(c => `
+        <div class="chat-msg nivel-${c.nivel || 'normal'}">
+            <div class="msg-header">
+                <div>
+                    <span style="font-size:14px">${tipoIcons[c.tipo] || ''}</span>
+                    <span class="msg-autor">${c.autor || 'Eu'}</span>
+                    <small style="color:#64748b;margin-left:6px">${tipoNomes[c.tipo] || c.tipo}</small>
+                    <span class="msg-nivel">${nivelNomes[c.nivel] || c.nivel}</span>
+                </div>
+                <div style="display:flex;align-items:center;gap:8px">
+                    <span class="msg-data">${formatarData(c.criado_em)}</span>
+                    <button class="msg-copy" onclick="copiarMsg(this, ${c.id})" title="Copiar">&#128203;</button>
+                    <button class="msg-del" onclick="deletarComentario(${c.id})" title="Remover">&times;</button>
+                </div>
+            </div>
+            <div class="msg-texto">${escapeHtml(c.texto)}</div>
+        </div>
+    `).join('');
+
+    area.scrollTop = area.scrollHeight;
+}
+
+function escapeHtml(text) {
+    const d = document.createElement('div');
+    d.textContent = text;
+    return d.innerHTML;
+}
+
+function copiarMsg(btn, id) {
+    const c = modalComentarios.find(x => x.id === id) || splitComentarios.find(x => x.id === id);
+    if (!c) return;
+    navigator.clipboard.writeText(c.texto).then(() => {
+        btn.classList.add('copied');
+        btn.innerHTML = '&#10003;';
+        setTimeout(() => { btn.classList.remove('copied'); btn.innerHTML = '&#128203;'; }, 1500);
+    });
+}
+
+async function enviarComentario() {
+    const textarea = document.getElementById('chat-texto');
+    const texto = textarea.value.trim();
+    if (!texto || !modalRefId) return;
+
+    const tipo = document.getElementById('chat-tipo').value;
+    const nivel = document.getElementById('chat-nivel').value;
+
+    try {
+        await fetch(`/api/comentarios/${modalRefId}`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({texto, tipo, nivel, autor: tipo === 'mensagem_pregoeiro' ? 'Pregoeiro' : tipo === 'mensagem_sistema' ? 'Sistema' : 'Eu'})
+        });
+        textarea.value = '';
+        carregarComentarios();
+        atualizarBadgesChat([modalRefId]);
+    } catch(e) { console.error('Erro enviar:', e); }
+}
+
+async function deletarComentario(id) {
+    if (!confirm('Remover esta mensagem?')) return;
+    try {
+        await fetch(`/api/comentarios/remover/${id}`, {method: 'DELETE'});
+        carregarComentarios();
+        atualizarBadgesChat([modalRefId]);
+    } catch(e) { console.error('Erro deletar:', e); }
+}
+
+// ── SPLIT PANEL ──
+
+let splitRefId = null;
+let splitDados = [];
+let splitComentarios = [];
+let splitTabAtual = 'todas';
+
+async function carregarSplitPanel() {
+    // Combine oportunidades + acompanhamentos
+    try {
+        const [r1, r2] = await Promise.all([fetch('/api/oportunidades'), fetch('/api/acompanhamentos')]);
+        const ops = await r1.json();
+        const acomps = await r2.json();
+        splitDados = [
+            ...ops.map(op => ({id: op.id, orgao: op.orgao, objeto: op.objeto, uf: op.uf, valor: op.valor_estimado, tipo: 'op'})),
+            ...acomps.map(a => ({id: a.id, orgao: a.orgao, objeto: a.objeto, uf: a.uf, valor: a.valor_estimado, tipo: 'acomp'}))
+        ];
+        renderSplitList();
+    } catch(e) { console.error('Erro split:', e); }
+}
+
+function renderSplitList() {
+    const container = document.getElementById('split-list');
+    const busca = (document.getElementById('split-busca')?.value || '').toLowerCase();
+    let filtrados = splitDados;
+    if (busca) filtrados = filtrados.filter(d => (d.objeto||'').toLowerCase().includes(busca) || (d.orgao||'').toLowerCase().includes(busca));
+
+    if (!filtrados.length) {
+        container.innerHTML = '<div style="padding:20px;text-align:center;color:#64748b">Nenhuma licitacao encontrada</div>';
+        return;
+    }
+    container.innerHTML = filtrados.map(d => `
+        <div class="split-item ${d.id === splitRefId ? 'active' : ''}" onclick="selecionarSplitItem('${d.id}', '${(d.objeto||'').substring(0,60).replace(/'/g,"\\'")}', '${d.uf||''}', '${(d.orgao||'').replace(/'/g,"\\'")}')">
+            <div class="si-orgao">${d.orgao || 'Sem orgao'}</div>
+            <div class="si-objeto">${d.objeto || 'Sem descricao'}</div>
+            <div class="si-meta">
+                <span>${d.uf || '-'}</span>
+                <span class="si-valor">${d.valor ? formatarValorCurto(d.valor) : '-'}</span>
+                <span style="color:#64748b">${d.tipo === 'acomp' ? 'Acomp.' : 'Op.'}</span>
+            </div>
+        </div>
+    `).join('');
+}
+
+function selecionarSplitItem(id, objeto, uf, orgao) {
+    splitRefId = id;
+    splitTabAtual = 'todas';
+    document.getElementById('split-chat-placeholder').style.display = 'none';
+    const container = document.getElementById('split-chat-container');
+    container.style.display = 'flex';
+    document.getElementById('split-chat-titulo').textContent = objeto || 'Licitacao';
+    document.getElementById('split-chat-sub').textContent = `${uf} - ${orgao}`;
+    document.getElementById('split-chat-busca').value = '';
+    document.querySelectorAll('#split-modal-tabs .modal-tab').forEach((t,i) => t.classList.toggle('active', i===0));
+    renderSplitList();
+    setLastSeen(id);
+    carregarSplitComentarios();
+}
+
+async function carregarSplitComentarios() {
+    if (!splitRefId) return;
+    try {
+        const r = await fetch(`/api/comentarios/${splitRefId}`);
+        splitComentarios = await r.json();
+        renderSplitComentarios();
+    } catch(e) { console.error('Erro split comentarios:', e); }
+}
+
+function renderSplitComentarios() {
+    const area = document.getElementById('split-chat-area');
+    let filtrados = splitComentarios;
+    if (splitTabAtual === 'anotacoes') filtrados = filtrados.filter(c => c.tipo === 'anotacao');
+    else if (splitTabAtual === 'pregoeiro') filtrados = filtrados.filter(c => c.tipo === 'mensagem_pregoeiro' || c.tipo === 'mensagem_sistema');
+
+    const buscaTermo = (document.getElementById('split-chat-busca')?.value || '').toLowerCase().trim();
+    if (buscaTermo) filtrados = filtrados.filter(c => c.texto.toLowerCase().includes(buscaTermo));
+
+    const countTodas = splitComentarios.length;
+    const countPreg = splitComentarios.filter(c => c.tipo === 'mensagem_pregoeiro' || c.tipo === 'mensagem_sistema').length;
+    const countAnot = splitComentarios.filter(c => c.tipo === 'anotacao').length;
+    const ct = document.getElementById('split-count-todas'); if(ct) ct.textContent = countTodas;
+    const cp = document.getElementById('split-count-preg'); if(cp) cp.textContent = countPreg;
+    const ca = document.getElementById('split-count-anot'); if(ca) ca.textContent = countAnot;
+
+    if (!filtrados.length) {
+        area.innerHTML = '<div class="chat-empty">Nenhuma mensagem ainda</div>';
+        return;
+    }
+
+    const nivelNomes = {normal:'Normal', item:'Item', aviso:'Aviso', moderado:'Moderado', grave:'Grave', urgente:'Urgente'};
+    const tipoIcons = {anotacao:'&#128221;', mensagem_pregoeiro:'&#128227;', mensagem_sistema:'&#9881;'};
+    const tipoNomes = {anotacao:'Anotacao', mensagem_pregoeiro:'Pregoeiro', mensagem_sistema:'Sistema'};
+
+    area.innerHTML = filtrados.map(c => `
+        <div class="chat-msg nivel-${c.nivel || 'normal'}">
+            <div class="msg-header">
+                <div>
+                    <span style="font-size:14px">${tipoIcons[c.tipo] || ''}</span>
+                    <span class="msg-autor">${c.autor || 'Eu'}</span>
+                    <small style="color:#64748b;margin-left:6px">${tipoNomes[c.tipo] || c.tipo}</small>
+                    <span class="msg-nivel">${nivelNomes[c.nivel] || c.nivel}</span>
+                </div>
+                <div style="display:flex;align-items:center;gap:8px">
+                    <span class="msg-data">${formatarData(c.criado_em)}</span>
+                    <button class="msg-copy" onclick="copiarMsg(this, ${c.id})" title="Copiar">&#128203;</button>
+                    <button class="msg-del" onclick="deletarSplitComentario(${c.id})" title="Remover">&times;</button>
+                </div>
+            </div>
+            <div class="msg-texto">${escapeHtml(c.texto)}</div>
+        </div>
+    `).join('');
+    area.scrollTop = area.scrollHeight;
+}
+
+async function enviarComentarioSplit() {
+    const textarea = document.getElementById('split-chat-texto');
+    const texto = textarea.value.trim();
+    if (!texto || !splitRefId) return;
+    const tipo = document.getElementById('split-chat-tipo').value;
+    const nivel = document.getElementById('split-chat-nivel').value;
+    try {
+        await fetch(`/api/comentarios/${splitRefId}`, {
+            method: 'POST', headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({texto, tipo, nivel, autor: tipo === 'mensagem_pregoeiro' ? 'Pregoeiro' : tipo === 'mensagem_sistema' ? 'Sistema' : 'Eu'})
+        });
+        textarea.value = '';
+        carregarSplitComentarios();
+    } catch(e) { console.error('Erro enviar split:', e); }
+}
+
+async function deletarSplitComentario(id) {
+    if (!confirm('Remover esta mensagem?')) return;
+    try {
+        await fetch(`/api/comentarios/remover/${id}`, {method: 'DELETE'});
+        carregarSplitComentarios();
+    } catch(e) { console.error('Erro deletar split:', e); }
+}
+
+// Override trocarModalTab for split panel context
+const _trocarModalTabOriginal = trocarModalTab;
+trocarModalTab = function(tab) {
+    if (abaAtual === 'chatpanel') {
+        splitTabAtual = tab;
+        document.querySelectorAll('#split-modal-tabs .modal-tab').forEach(t => t.classList.toggle('active', t.dataset.tab === tab));
+        renderSplitComentarios();
+    } else {
+        _trocarModalTabOriginal(tab);
+    }
+};
+
+// Ctrl+Enter para enviar
+document.addEventListener('keydown', function(e) {
+    if (e.ctrlKey && e.key === 'Enter') {
+        if (abaAtual === 'chatpanel' && splitRefId) enviarComentarioSplit();
+        else if (modalRefId) enviarComentario();
+    }
+});
+
+// Colagem inteligente — detecta texto do pregoeiro
+document.getElementById('chat-texto').addEventListener('paste', function(e) {
+    setTimeout(() => {
+        const texto = this.value.trim();
+        if (!texto) return;
+        const linhas = texto.split('\n').length;
+        const padroesPregoeiro = /prezad|senhor|sr\.|sra\.|comunicamos|informamos|solicit|esclarec|impugna|recurso|proposta|lance|habilitac|sessao|encerrad|suspend|reaber|desclassific|adjudic|homolog/i;
+        if (linhas >= 3 || padroesPregoeiro.test(texto)) {
+            document.getElementById('chat-tipo').value = 'mensagem_pregoeiro';
+            this.style.borderColor = '#f59e0b';
+            setTimeout(() => this.style.borderColor = '', 2000);
+        }
+    }, 50);
+});
+
+// ── NOTIFICACOES ──
+
+let notifPermitido = Notification.permission === 'granted';
+let totalAnterior = 0;
+
+function atualizarBtnNotif() {
+    const btn = document.getElementById('btn-notif');
+    if (Notification.permission === 'granted') {
+        btn.textContent = 'Notif. ON';
+        btn.className = 'btn btn-success';
+        notifPermitido = true;
+    } else if (Notification.permission === 'denied') {
+        btn.textContent = 'Notif. Bloq.';
+        btn.className = 'btn btn-danger';
+    }
+}
+
+function pedirPermissaoNotif() {
+    if (!('Notification' in window)) { alert('Navegador nao suporta notificacoes'); return; }
+    Notification.requestPermission().then(p => {
+        atualizarBtnNotif();
+        if (p === 'granted') notificar('Radar Licitacoes', 'Notificacoes ativadas! Voce sera avisado sobre prazos e novas oportunidades.');
+    });
+}
+
+function notificar(titulo, corpo) {
+    if (!notifPermitido) return;
+    try { new Notification(titulo, {body: corpo, icon: ''}); } catch(e) {}
+}
+
+function verificarNotificacoes(dados) {
+    if (!notifPermitido) return;
+    // Alertar sobre prazos < 48h
+    const urgentes = dados.filter(op => {
+        if (!op.data_encerramento || ['ganha','perdida','descartada'].includes(op.status)) return false;
+        const diff = (new Date(op.data_encerramento) - new Date()) / (1000*60*60);
+        return diff > 0 && diff <= 48;
+    });
+    if (urgentes.length > 0) {
+        notificar('Prazos Urgentes!', `${urgentes.length} licitacao(oes) vencem em menos de 48h!`);
+    }
+    // Alertar sobre novas oportunidades
+    if (totalAnterior > 0 && dados.length > totalAnterior) {
+        const novas = dados.length - totalAnterior;
+        notificar('Novas Oportunidades', `${novas} nova(s) oportunidade(s) detectada(s)!`);
+    }
+    totalAnterior = dados.length;
+
+    // Verificar palavras-chave
+    verificarPalavrasChave(dados);
+}
+
+// ── PALAVRAS-CHAVE ──
+
+function getPalavras() {
+    try { return JSON.parse(localStorage.getItem('palavrasChave') || '[]'); } catch(e) { return []; }
+}
+
+function salvarPalavras(lista) {
+    localStorage.setItem('palavrasChave', JSON.stringify(lista));
+}
+
+function abrirPalavrasChave() {
+    document.getElementById('modal-palavras').classList.add('open');
+    renderPalavras();
+}
+
+function fecharPalavrasChave() {
+    document.getElementById('modal-palavras').classList.remove('open');
+}
+
+function renderPalavras() {
+    const container = document.getElementById('lista-palavras');
+    const palavras = getPalavras();
+    if (!palavras.length) {
+        container.innerHTML = '<span style="color:#64748b;font-size:13px">Nenhuma palavra cadastrada</span>';
+        return;
+    }
+    container.innerHTML = palavras.map((p, i) => `
+        <span style="background:#8b5cf630;color:#c084fc;padding:4px 10px;border-radius:6px;font-size:12px;display:flex;align-items:center;gap:6px">
+            ${escapeHtml(p)}
+            <button onclick="removerPalavra(${i})" style="background:none;border:none;color:#c084fc;cursor:pointer;font-size:14px">&times;</button>
+        </span>
+    `).join('');
+}
+
+function adicionarPalavra() {
+    const input = document.getElementById('nova-palavra');
+    const palavra = input.value.trim().toLowerCase();
+    if (!palavra) return;
+    const lista = getPalavras();
+    if (lista.includes(palavra)) { input.value = ''; return; }
+    lista.push(palavra);
+    salvarPalavras(lista);
+    input.value = '';
+    renderPalavras();
+}
+
+function removerPalavra(idx) {
+    const lista = getPalavras();
+    lista.splice(idx, 1);
+    salvarPalavras(lista);
+    renderPalavras();
+}
+
+let palavrasAlertadas = new Set();
+
+function verificarPalavrasChave(dados) {
+    const palavras = getPalavras();
+    if (!palavras.length) return;
+    dados.forEach(op => {
+        const texto = (op.objeto || '').toLowerCase();
+        palavras.forEach(p => {
+            if (texto.includes(p) && !palavrasAlertadas.has(op.id + ':' + p)) {
+                palavrasAlertadas.add(op.id + ':' + p);
+                notificar('Palavra-chave detectada!', `"${p}" encontrada em: ${(op.objeto||'').substring(0,80)}`);
+            }
+        });
+    });
+}
+
+// ── EXPORTAR PDF ──
+
+function exportarChatPDF() {
+    const comentarios = modalRefId ? modalComentarios : splitComentarios;
+    if (!comentarios.length) { alert('Nenhuma mensagem para exportar'); return; }
+    const titulo = document.getElementById('modal-titulo')?.textContent || 'Chat';
+
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF();
+    const pageW = doc.internal.pageSize.getWidth();
+    let y = 20;
+
+    doc.setFontSize(16);
+    doc.setTextColor(0, 0, 0);
+    doc.text('Historico de Mensagens', 14, y);
+    y += 8;
+    doc.setFontSize(10);
+    doc.setTextColor(100, 100, 100);
+    doc.text(titulo.substring(0, 80), 14, y);
+    y += 6;
+    doc.text('Exportado em: ' + new Date().toLocaleString('pt-BR'), 14, y);
+    y += 4;
+    doc.setDrawColor(200); doc.line(14, y, pageW - 14, y);
+    y += 8;
+
+    const tipoNomes = {anotacao:'Anotacao', mensagem_pregoeiro:'Pregoeiro', mensagem_sistema:'Sistema'};
+
+    comentarios.forEach(c => {
+        if (y > 260) { doc.addPage(); y = 20; }
+        // Header
+        doc.setFontSize(9);
+        doc.setTextColor(0, 100, 200);
+        const header = `${c.autor || 'Eu'} (${tipoNomes[c.tipo] || c.tipo}) - ${c.nivel !== 'normal' ? c.nivel.toUpperCase() + ' - ' : ''}${formatarData(c.criado_em)}`;
+        doc.text(header, 14, y);
+        y += 5;
+        // Text
+        doc.setFontSize(10);
+        doc.setTextColor(0, 0, 0);
+        const linhas = doc.splitTextToSize(c.texto, pageW - 28);
+        linhas.forEach(l => {
+            if (y > 275) { doc.addPage(); y = 20; }
+            doc.text(l, 14, y);
+            y += 5;
+        });
+        y += 3;
+        doc.setDrawColor(230); doc.line(14, y, pageW - 14, y);
+        y += 5;
+    });
+
+    doc.save(`chat_${modalRefId || splitRefId || 'export'}_${new Date().toISOString().slice(0,10)}.pdf`);
+}
+
+// ── POLLING AUTOMATICO ──
+
+let pollingInterval = null;
+let pollingMinutos = parseInt(localStorage.getItem('pollingMinutos') || '5');
+
+function iniciarPolling(min) {
+    if (pollingInterval) clearInterval(pollingInterval);
+    pollingMinutos = min;
+    localStorage.setItem('pollingMinutos', min);
+    if (min <= 0) { pollingInterval = null; atualizarBtnPolling(); return; }
+    pollingInterval = setInterval(() => {
+        if (abaAtual === 'oportunidades') carregarDados();
+        else if (abaAtual === 'acompanhamento') carregarAcompanhamentos();
+        else if (abaAtual === 'chatpanel') carregarSplitPanel();
+    }, min * 60 * 1000);
+    atualizarBtnPolling();
+}
+
+function atualizarBtnPolling() {
+    const sel = document.getElementById('polling-select');
+    if (sel) sel.value = pollingMinutos;
+}
+
+// Inicializar
+atualizarBtnNotif();
 carregarDados();
+iniciarPolling(pollingMinutos);
 </script>
 </body>
 </html>
