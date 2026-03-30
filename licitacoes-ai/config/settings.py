@@ -3,7 +3,7 @@ import os
 from pathlib import Path
 from dotenv import load_dotenv
 
-load_dotenv()
+load_dotenv(override=True)
 
 # Paths
 BASE_DIR = Path(__file__).parent.parent
@@ -14,7 +14,8 @@ DB_PATH = DATA_DIR / "licitacoes.db"
 
 # LLM
 ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY")
-CLAUDE_MODEL = os.getenv("CLAUDE_MODEL", "claude-sonnet-4-20250514")
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+CLAUDE_MODEL = os.getenv("CLAUDE_MODEL", "claude-haiku-4-20250414")
 
 # Telegram
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
@@ -38,7 +39,7 @@ CNAES_GRUPO = {
 # Palavras-chave de interesse (objeto da licitação)
 KEYWORDS_INTERESSE = [
     "limpeza", "conservação", "asseio", "facilities", "predial",
-    "terceirização", "mão de obra", "apoio administrativo",
+    "terceirização", "mão de obra", "apoio administrativo", "apoio operacional",
     "recepção", "recepcionista", "portaria", "copeiragem",
     "vigilância", "segurança", "vigia", "controlador de acesso",
     "brigada", "bombeiro civil",
@@ -48,6 +49,8 @@ KEYWORDS_INTERESSE = [
     "técnico administrativo", "arquivologia", "arquivista",
     "jardinagem", "paisagismo", "zeladoria",
     "engenharia", "construção", "reforma", "obra",
+    "coleta de resíduos", "destinação de resíduos", "transporte de resíduos",
+    "resíduos sólidos", "manejo de resíduos",
 ]
 
 # Palavras-chave de exclusão (não nos interessa)

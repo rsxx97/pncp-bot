@@ -93,19 +93,24 @@ def analisar_competitividade(
         lance_maximo = valor_proposta * 1.15
         lance_minimo = valor_proposta
 
-    # Margem sobre custo
-    margem = ((lance_sugerido - valor_proposta) / valor_proposta * 100) if valor_proposta > 0 else 0
+    # Margem = desconto sobre o teto do edital (mais útil para decisão)
+    desconto_real = (1 - lance_sugerido / valor_global_ref) * 100 if valor_global_ref > 0 else 0
+    margem_sobre_custo = ((lance_sugerido - valor_proposta) / valor_proposta * 100) if valor_proposta > 0 else 0
+    margem_liquida = ((lance_sugerido - valor_proposta) / lance_sugerido * 100) if lance_sugerido > 0 else 0
 
     # Justificativa
     justificativas = []
     if valor_global_ref > 0:
-        desconto_real = (1 - lance_sugerido / valor_global_ref) * 100
-        justificativas.append(f"Desconto de {desconto_real:.1f}% sobre referência")
+        justificativas.append(f"Desconto de {desconto_real:.1f}% sobre teto do edital")
 
     if lance_sugerido > piso:
         justificativas.append(f"Acima do piso de inexequibilidade (R$ {piso:,.2f})")
     else:
         justificativas.append("ALERTA: Próximo ao piso de inexequibilidade!")
+
+    if valor_proposta > 0:
+        lucro_bruto = lance_sugerido - valor_proposta
+        justificativas.append(f"Lucro bruto estimado: R$ {lucro_bruto:,.2f}/ano ({margem_liquida:.1f}%)")
 
     if perfis:
         agressivos = [p for p in perfis if p.get("agressividade") == "alta"]
@@ -113,14 +118,13 @@ def analisar_competitividade(
             nomes = [p.get("nome_fantasia", p["cnpj"]) for p in agressivos]
             justificativas.append(f"Concorrentes agressivos: {', '.join(nomes)}")
 
-    justificativas.append(f"Margem sobre custo: {margem:.1f}%")
-
     return {
         "pncp_id": pncp_id,
         "lance_minimo": round(lance_minimo, 2),
         "lance_sugerido": round(lance_sugerido, 2),
         "lance_maximo": round(lance_maximo, 2),
-        "margem_sugerida_pct": round(margem, 2),
+        "margem_sugerida_pct": round(desconto_real, 2),
+        "margem_liquida_pct": round(margem_liquida, 2),
         "justificativa": " | ".join(justificativas),
         "concorrentes_esperados": concorrentes_nomes[:5],
         "perfis_concorrentes": perfis,

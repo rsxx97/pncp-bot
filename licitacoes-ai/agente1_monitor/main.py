@@ -48,7 +48,7 @@ def executar_monitor(
     usar_llm: bool = False,
     dias_retroativos: int = 3,
     modalidades: list[int] = None,
-    incluir_nacional: bool = True,
+    incluir_nacional: bool = False,
 ) -> dict:
     """Executa um ciclo completo de monitoramento.
 
@@ -113,11 +113,11 @@ def executar_monitor(
     novos_relevantes = []
 
     for edital in editais_unicos:
-        # Verifica se já existe no banco
+        # Verifica se já existe no banco — se já existe, NÃO reprocessa nem renotifica
         existente = get_edital(edital.pncp_id)
         if existente:
             stats["ja_conhecidos"] += 1
-            continue
+            continue  # Pula completamente — evita renotificação no Telegram
 
         stats["novos"] += 1
 
@@ -157,6 +157,7 @@ def executar_monitor(
             status=status,
         )
         db_dict["justificativa_score"] = classificacao.justificativa
+        db_dict["notificado_telegram"] = 1  # Marca como notificado para evitar reenvio
         upsert_edital(db_dict)
 
     # Atualiza estado do monitor

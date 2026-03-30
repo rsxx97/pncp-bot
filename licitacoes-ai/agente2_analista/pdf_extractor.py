@@ -1,6 +1,9 @@
 """Download e extração de texto/tabelas de PDFs de editais."""
 import logging
+import os
 import re
+import zipfile
+import tempfile
 from pathlib import Path
 
 import httpx
@@ -31,11 +34,15 @@ SECOES_RELEVANTES = [
     r"CONVEN[ÇC][ÃA]O\s+COLETIVA",
 ]
 
-MAX_CHARS = 80_000  # Limite de contexto para o LLM
+MAX_CHARS = 120_000  # Ampliado para capturar TRs longos sem truncar
 
 
 def download_pdf(url: str, filename: str = None) -> Path:
-    """Baixa PDF e salva em data/editais/. Retorna o path."""
+    """Baixa arquivo do PNCP e salva em data/editais/.
+
+    Se o arquivo for um ZIP, extrai o primeiro PDF encontrado.
+    Retorna o path do PDF.
+    """
     EDITAIS_DIR.mkdir(parents=True, exist_ok=True)
 
     if not filename:
@@ -49,13 +56,92 @@ def download_pdf(url: str, filename: str = None) -> Path:
         log.info(f"PDF já existe: {save_path}")
         return save_path
 
-    log.info(f"Baixando PDF: {url}")
-    with httpx.Client(timeout=120, follow_redirects=True) as client:
+    log.info(f"Baixando: {url}")
+    with httpx.Client(timeout=60, follow_redirects=True) as client:
         resp = client.get(url)
         resp.raise_for_status()
-        save_path.write_bytes(resp.content)
+        content = resp.content
 
-    log.info(f"PDF salvo: {save_path} ({save_path.stat().st_size / 1024:.0f} KB)")
+    # Detectar tipo de arquivo pelos magic bytes
+    if content[:2] == b'PK':
+        # É um ZIP — extrair PDFs
+        log.info("Arquivo é ZIP, extraindo PDFs...")
+        return _extrair_pdf_do_zip(content, save_path)
+    elif content[:5] == b'%PDF-':
+        # É PDF direto
+        save_path.write_bytes(content)
+        log.info(f"PDF salvo: {save_path} ({save_path.stat().st_size / 1024:.0f} KB)")
+        return save_path
+    else:
+        # Tenta salvar como PDF mesmo assim (pode ser PDF sem header padrão)
+        save_path.write_bytes(content)
+        log.warning(f"Tipo desconhecido, salvo como: {save_path}")
+        return save_path
+
+
+def _extrair_pdf_do_zip(zip_bytes: bytes, save_path: Path, depth: int = 0) -> Path:
+    """Extrai TODOS os documentos de um ZIP (recursivo para ZIP dentro de ZIP)."""
+    import io
+    if depth > 3:
+        raise ValueError("ZIP aninhado demais (>3 niveis)")
+
+    zf = zipfile.ZipFile(io.BytesIO(zip_bytes))
+    pncp_id = save_path.stem.replace('.pdf', '')
+    out_dir = save_path.parent
+
+    # Primeiro, descompactar ZIPs internos recursivamente
+    inner_zips = [n for n in zf.namelist() if n.lower().endswith('.zip')]
+    for iz in inner_zips:
+        log.info(f"ZIP interno encontrado: {iz}, descompactando...")
+        inner_bytes = zf.read(iz)
+        _extrair_pdf_do_zip(inner_bytes, save_path, depth + 1)
+
+    # Extrair todos os PDFs, XLSX, ODS, DOC
+    doc_exts = ('.pdf', '.xlsx', '.xls', '.ods', '.doc', '.docx')
+    all_docs = [n for n in zf.namelist() if any(n.lower().endswith(e) for e in doc_exts)]
+
+    edital_pdf = None
+    tr_pdf = None
+    for name in all_docs:
+        nl = name.lower()
+        base = os.path.basename(name).replace(' ', '_')
+        safe_name = f"{pncp_id}_{base}"
+        out_path = out_dir / safe_name
+
+        # Extrai o arquivo
+        content = zf.read(name)
+        out_path.write_bytes(content)
+        log.info(f"Extraido: {out_path.name} ({len(content) // 1024} KB)")
+
+        # Identifica edital e TR
+        if nl.endswith('.pdf'):
+            if 'edital' in nl and not edital_pdf:
+                edital_pdf = out_path
+            elif ('termo' in nl and 'referencia' in nl) or '-tr' in nl or '_tr' in nl or 'anexo-i-tr' in nl or 'anexo_i_tr' in nl:
+                tr_pdf = out_path
+
+    # Salva o edital principal no path esperado (só se ainda não existe do ZIP interno)
+    if edital_pdf and edital_pdf != save_path:
+        import shutil
+        shutil.copy2(str(edital_pdf), str(save_path))
+        log.info(f"Edital principal: {save_path.name}")
+    elif not edital_pdf and all_docs and not (save_path.exists() and save_path.stat().st_size > 100_000):
+        # Pega o maior PDF como edital, mas só se não já tem um edital grande do ZIP interno
+        pdfs = [out_dir / f"{pncp_id}_{os.path.basename(n).replace(' ', '_')}" for n in all_docs if n.lower().endswith('.pdf')]
+        pdfs = [p for p in pdfs if p.exists()]
+        if pdfs:
+            biggest = max(pdfs, key=lambda f: f.stat().st_size)
+            import shutil
+            shutil.copy2(str(biggest), str(save_path))
+
+    # Copia TR para o path padrao _TR.pdf
+    if tr_pdf:
+        tr_std = out_dir / save_path.name.replace('.pdf', '_TR.pdf')
+        if tr_pdf != tr_std:
+            import shutil
+            shutil.copy2(str(tr_pdf), str(tr_std))
+            log.info(f"TR copiado para: {tr_std.name}")
+
     return save_path
 
 

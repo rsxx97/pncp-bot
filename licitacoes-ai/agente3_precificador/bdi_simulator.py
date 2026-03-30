@@ -21,6 +21,7 @@ def simular_cenarios(
 ) -> list[dict]:
     """Simula 3 cenários de BDI: agressivo, competitivo, conservador."""
     cenarios_config = [
+        {"nome": "ultra_agressivo", "ci": 1.0, "lucro": 1.0},
         {"nome": "agressivo", "ci": 2.0, "lucro": 2.0},
         {"nome": "competitivo", "ci": 3.0, "lucro": 3.0},
         {"nome": "conservador", "ci": 5.0, "lucro": 5.0},

@@ -48,6 +48,8 @@ Regras:
 - Para vigilância, periculosidade=true por padrão
 - Se o prazo não for claro, assuma 12 meses
 - regime_tributario: "lucro_real" para empresas maiores, "lucro_presumido" para menores
+- sindicato_sugerido DEVE refletir a CCT identificada no edital (ex: se edital menciona SEAC-RJ, use "SEAC-RJ"; se menciona SINDEPRESTEM, use "SINDEPRESTEM-RJ")
+- Se o edital especifica pisos salariais ou valores de benefícios da CCT, inclua como salario_edital em cada posto
 """
 
 PROMPT_EXTRAIR_POSTOS = """Analise os dados deste edital e extraia os postos de trabalho e parâmetros de custo.

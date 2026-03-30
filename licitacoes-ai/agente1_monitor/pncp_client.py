@@ -216,12 +216,26 @@ def buscar_itens_compra(cnpj: str, ano: int, seq: int) -> list[dict]:
 
 
 def buscar_arquivos_compra(cnpj: str, ano: int, seq: int) -> list[dict]:
-    """Busca documentos/arquivos de uma compra (PDFs do edital)."""
-    url = f"{PNCP_BASE_URL}/orgaos/{cnpj}/compras/{ano}/{seq}/arquivos"
+    """Busca documentos/arquivos de uma compra (PDFs do edital).
+
+    A API PNCP retorna URLs como /pncp-api/v1/.../arquivos/N
+    que servem o arquivo diretamente (PDF). O título geralmente
+    contém o nome do arquivo original com extensão.
+
+    Nota: endpoint de arquivos usa api/pncp/v1 (não api/consulta/v1).
+    """
+    # Endpoint de arquivos é diferente do de consulta
+    PNCP_ARQUIVOS_URL = "https://pncp.gov.br/api/pncp/v1"
+    url = f"{PNCP_ARQUIVOS_URL}/orgaos/{cnpj}/compras/{ano}/{seq}/arquivos"
     dados = _get(url, {})
     if not dados:
         return []
-    return dados if isinstance(dados, list) else dados.get("data", [])
+    arquivos = dados if isinstance(dados, list) else dados.get("data", [])
+    # Normalizar: garantir que todos tenham campo 'titulo' e 'url'
+    for arq in arquivos:
+        if not arq.get("url") and arq.get("uri"):
+            arq["url"] = arq["uri"]
+    return arquivos
 
 
 def buscar_edital_por_id(cnpj: str, ano: int, seq: int) -> EditalResumo | None:
@@ -235,3 +249,100 @@ def buscar_edital_por_id(cnpj: str, ano: int, seq: int) -> EditalResumo | None:
     except Exception as e:
         log.error(f"Erro ao processar edital {cnpj}/{ano}/{seq}: {e}")
         return None
+
+
+def buscar_editais_por_texto(query: str, tam_pagina: int = 20, paginas: int = 1) -> list[dict]:
+    """Busca editais no PNCP por texto livre (objeto, orgao, etc).
+
+    Usa o endpoint /api/search/ do portal PNCP.
+    Retorna lista de dicts com dados do edital.
+    """
+    url = "https://pncp.gov.br/api/search/"
+    all_items = []
+    try:
+        with httpx.Client(timeout=30) as client:
+            for pag in range(1, paginas + 1):
+                _rate_limit()
+                resp = client.get(url, params={
+                    "q": query,
+                    "tipos_documento": "edital",
+                    "pagina": pag,
+                    "tam_pagina": tam_pagina,
+                })
+                if resp.status_code != 200:
+                    log.warning(f"Search PNCP retornou {resp.status_code}")
+                    break
+                data = resp.json()
+                items = data.get("items", [])
+                if not items:
+                    break
+                # Converte item_url em pncp_id
+                for it in items:
+                    item_url = it.get("item_url", "")
+                    parts = item_url.replace("/compras/", "").split("/")
+                    if len(parts) == 3:
+                        it["pncp_id"] = f"{parts[0]}-{parts[1]}-{parts[2]}"
+                all_items.extend(items)
+                total = data.get("total", 0)
+                if pag * tam_pagina >= total:
+                    break
+        log.info(f"Search PNCP '{query}': {len(all_items)} resultados em {paginas} página(s)")
+    except Exception as e:
+        log.error(f"Erro na busca PNCP: {e}")
+    return all_items
+
+
+def buscar_editais_por_cnpj_orgao(
+    cnpj_orgao: str,
+    dias_retroativos: int = 90,
+    tam_pagina: int = 50,
+) -> list[EditalResumo]:
+    """Busca editais de um órgão específico pelo CNPJ.
+
+    Útil para encontrar licitações de um órgão quando se tem o CNPJ/UASG.
+    """
+    hoje = date.today()
+    data_inicio = hoje - timedelta(days=dias_retroativos)
+
+    # Remove formatação do CNPJ (pontos, barras, traços)
+    cnpj_limpo = cnpj_orgao.replace(".", "").replace("/", "").replace("-", "").strip()
+
+    url = f"{PNCP_BASE_URL}/contratacoes/publicacao"
+    editais = []
+    pncp_ids_vistos = set()
+
+    pagina = 1
+    while True:
+        params = {
+            "dataInicial": data_inicio.strftime("%Y%m%d"),
+            "dataFinal": hoje.strftime("%Y%m%d"),
+            "cnpj": cnpj_limpo,
+            "pagina": pagina,
+            "tamanhoPagina": tam_pagina,
+        }
+
+        dados = _get(url, params)
+        if not dados:
+            break
+
+        itens = dados.get("data", [])
+        if not itens:
+            break
+
+        for item in itens:
+            try:
+                edital = _item_to_edital(item)
+                if edital.pncp_id not in pncp_ids_vistos:
+                    pncp_ids_vistos.add(edital.pncp_id)
+                    editais.append(edital)
+            except Exception as e:
+                log.warning(f"Erro ao processar item: {e}")
+                continue
+
+        total_paginas = dados.get("totalPaginas", 1)
+        if pagina >= total_paginas:
+            break
+        pagina += 1
+
+    log.info(f"Busca por CNPJ {cnpj_limpo}: {len(editais)} editais encontrados")
+    return editais

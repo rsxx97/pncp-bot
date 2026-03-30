@@ -2,7 +2,12 @@
 __pycache__/
 *.pyc
 data/licitacoes.db
+data/licitacoes.db-shm
+data/licitacoes.db-wal
 data/editais/*.pdf
+data/editais/*.zip
+data/editais/*.rar
+data/planilhas/*.xlsx
 data/licitacoes.log
 *.egg-info/
 dist/
@@ -14,3 +19,5 @@ frontend/dist/
 .DS_Store
 Thumbs.db
 bot.lock
+server_lan.log
+*.log

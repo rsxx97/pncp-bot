@@ -16,10 +16,10 @@ export default function MetricCards({ metrics }) {
     : `R$ ${(metrics.volume_total / 1e3).toFixed(0)}K`;
 
   return (
-    <div style={{ display: "grid", gridTemplateColumns: "repeat(4, minmax(0, 1fr))", gap: 12, marginBottom: 32 }}>
+    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 10, marginBottom: 28 }}>
       <MetricCard label="Editais hoje" value={metrics.editais_hoje} sub={`${metrics.editais_score_60} com score 60+`} />
       <MetricCard label="Score 60+" value={metrics.editais_score_60} sub={`de ${metrics.editais_hoje + metrics.editais_score_60} total`} />
-      <MetricCard label="Planilhas prontas" value={metrics.planilhas_prontas} sub={`${volume} em volume`} />
+      <MetricCard label="Planilhas geradas" value={metrics.planilhas_prontas} sub={`${volume} em volume`} />
       <MetricCard label="Custo API hoje" value={`$${metrics.custo_api_hoje_usd.toFixed(2)}`} sub={`${metrics.chamadas_api_hoje} chamadas`} />
     </div>
   );

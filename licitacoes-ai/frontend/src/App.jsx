@@ -1,31 +1,37 @@
 import { useState, useEffect, useCallback } from "react";
 import { api } from "./api";
-import MetricCards from "./components/MetricCards";
+import KPIDashboard from "./components/KPIDashboard";
 import EditalTable from "./components/EditalTable";
 import EditalDetailPanel from "./components/EditalDetail";
-import WeeklyChart from "./components/WeeklyChart";
+import PncpSearch from "./components/PncpSearch";
+import Perfil from "./components/Perfil";
 import ConcorrentePanel from "./components/ConcorrentePanel";
+import PregaoPanel from "./components/PregaoPanel";
 
-export default function App() {
-  const [metrics, setMetrics] = useState(null);
+const C = {
+  bg: "#09090B", s1: "#111114", s2: "#18181C", s3: "#222228",
+  b1: "#2A2A32", b2: "#3A3A44",
+  t1: "#EEEEE8", t2: "#98968E", t3: "#5A5854",
+  ac: "#BEFF3A", rd: "#FF4D4D", am: "#FFB038", tl: "#2EDDA8", bl: "#5A9EF7",
+};
+
+const mono = "'JetBrains Mono', monospace";
+
+function Dashboard({ onLogout }) {
   const [editais, setEditais] = useState([]);
   const [totalEditais, setTotalEditais] = useState(0);
-  const [weeklyData, setWeeklyData] = useState([]);
-  const [concorrentes, setConcorrentes] = useState([]);
   const [filter, setFilter] = useState("todos");
   const [selectedPncpId, setSelectedPncpId] = useState(null);
-  const [now, setNow] = useState(new Date());
+  const [tab, setTab] = useState("pipeline");
+  const [searchText, setSearchText] = useState("");
+  const [period, setPeriod] = useState("90d");
 
   const statusMap = {
     todos: [],
     novo: ["novo", "classificado"],
-    go: ["analisado", "go", "go_com_ressalvas"],
+    go: ["analisado", "go", "go_com_ressalvas", "go_sem_ressalvas"],
     pronto: ["precificado", "competitivo_pronto"],
   };
-
-  const loadMetrics = useCallback(async () => {
-    try { setMetrics(await api.getMetrics()); } catch (e) { console.error(e); }
-  }, []);
 
   const loadEditais = useCallback(async () => {
     try {
@@ -37,91 +43,144 @@ export default function App() {
     } catch (e) { console.error(e); }
   }, [filter]);
 
-  const loadWeekly = useCallback(async () => {
-    try { setWeeklyData(await api.getWeeklyChart()); } catch (e) { console.error(e); }
-  }, []);
-
-  const loadConcorrentes = useCallback(async () => {
-    try { setConcorrentes(await api.getConcorrentes()); } catch (e) { console.error(e); }
-  }, []);
-
-  const loadAll = useCallback(() => {
-    loadMetrics();
-    loadEditais();
-    loadWeekly();
-    loadConcorrentes();
-  }, [loadMetrics, loadEditais, loadWeekly, loadConcorrentes]);
-
-  useEffect(() => { loadAll(); }, [loadAll]);
   useEffect(() => { loadEditais(); }, [filter, loadEditais]);
-  useEffect(() => {
-    const t = setInterval(() => setNow(new Date()), 60000);
-    return () => clearInterval(t);
-  }, []);
 
   const filters = [
     { key: "todos", label: "Todos", count: totalEditais },
     { key: "novo", label: "Novos", count: editais.filter(e => e.status === "novo" || e.status === "classificado").length },
-    { key: "go", label: "Go", count: editais.filter(e => ["analisado", "go", "go_com_ressalvas"].includes(e.status)).length },
+    { key: "go", label: "Go", count: editais.filter(e => (e.parecer || e.status || "").startsWith("go") || e.status === "analisado").length },
     { key: "pronto", label: "Prontos", count: editais.filter(e => ["precificado", "competitivo_pronto"].includes(e.status)).length },
   ];
 
-  const ultimoScan = metrics?.ultimo_scan
-    ? new Date(metrics.ultimo_scan).toLocaleString("pt-BR", { hour: "2-digit", minute: "2-digit", day: "2-digit", month: "short" })
-    : "—";
-
   return (
-    <div style={{ fontFamily: "'DM Sans', -apple-system, sans-serif", color: "#1A1A18", maxWidth: 960, margin: "0 auto", padding: "0 4px" }}>
+    <div style={{ fontFamily: "'Instrument Sans', 'DM Sans', sans-serif", color: C.t1, background: C.bg, minHeight: "100vh", position: "relative", overflow: "hidden" }}>
+      {/* Orbs de glow */}
+      <div style={{ position: "fixed", top: -200, left: -200, width: 600, height: 600, borderRadius: "50%", background: `radial-gradient(circle, ${C.ac}08, transparent 70%)`, pointerEvents: "none", animation: "breathe 8s ease-in-out infinite" }} />
+      <div style={{ position: "fixed", top: "40%", right: -300, width: 700, height: 700, borderRadius: "50%", background: `radial-gradient(circle, ${C.tl}06, transparent 70%)`, pointerEvents: "none", animation: "breathe 10s ease-in-out infinite 2s" }} />
+      <div style={{ position: "fixed", bottom: -200, left: "30%", width: 500, height: 500, borderRadius: "50%", background: `radial-gradient(circle, ${C.bl}05, transparent 70%)`, pointerEvents: "none", animation: "breathe 12s ease-in-out infinite 4s" }} />
 
-      {/* Header */}
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 28, marginTop: 24, flexWrap: "wrap", gap: 12 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
-          <h1 style={{ fontSize: 24, fontWeight: 700, margin: 0, letterSpacing: -0.5 }}>Licitacoes AI</h1>
-          {metrics?.monitor_ativo && (
-            <span style={{ background: "#D1FAE5", color: "#065F46", fontSize: 12, fontWeight: 600, padding: "4px 12px", borderRadius: 20 }}>Monitor ativo</span>
-          )}
+      <style>{`
+        @keyframes breathe { 0%,100% { opacity: 0.04 } 50% { opacity: 0.08 } }
+        @keyframes livePulse { 0%,100% { box-shadow: 0 0 0 0 rgba(190,255,58,0.4) } 50% { box-shadow: 0 0 0 6px rgba(190,255,58,0) } }
+        @import url('https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+        body { margin: 0; background: ${C.bg}; }
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: ${C.s2}; }
+        ::-webkit-scrollbar-thumb { background: ${C.b2}; border-radius: 3px; }
+      `}</style>
+
+      <div style={{ maxWidth: 1060, margin: "0 auto", padding: "0 16px", position: "relative", zIndex: 1 }}>
+        {/* Header */}
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "20px 0 24px", flexWrap: "wrap", gap: 12 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <div style={{ width: 8, height: 8, borderRadius: "50%", background: C.ac, animation: "livePulse 2s infinite" }} />
+            <h1 style={{ fontSize: 20, fontWeight: 700, margin: 0, letterSpacing: -0.5, color: C.t1 }}>Licitações AI</h1>
+          </div>
+          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+            {["7d", "30d", "90d", "YTD"].map(p => (
+              <button key={p} onClick={() => setPeriod(p.toLowerCase())}
+                style={{
+                  fontFamily: mono, fontSize: 10, padding: "4px 10px", borderRadius: 6, cursor: "pointer", border: "none",
+                  background: period === p.toLowerCase() ? C.s3 : "transparent",
+                  color: period === p.toLowerCase() ? C.t1 : C.t3,
+                  fontWeight: 600,
+                }}>
+                {p}
+              </button>
+            ))}
+          </div>
         </div>
-        <div style={{ fontSize: 13, color: "#AEAEA8" }}>Ultimo scan: {ultimoScan}</div>
-      </div>
 
-      {/* Metrics */}
-      <MetricCards metrics={metrics} />
+        {/* KPI Dashboard */}
+        <KPIDashboard period={period} />
 
-      {/* Pipeline header */}
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16, flexWrap: "wrap", gap: 10 }}>
-        <h2 style={{ fontSize: 18, fontWeight: 600, margin: 0 }}>Pipeline de editais</h2>
-        <div style={{ display: "flex", gap: 6 }}>
-          {filters.map(f => (
-            <button key={f.key} onClick={() => setFilter(f.key)}
-              style={{ fontSize: 12, padding: "5px 14px", borderRadius: 20, cursor: "pointer", fontWeight: 500, border: "none", transition: "all 0.15s",
-                background: filter === f.key ? "#1A1A18" : "#F0F0EC", color: filter === f.key ? "#FFFFFF" : "#8A8A85" }}>
-              {f.label} ({f.count})
+        {/* Tab navigation */}
+        <div style={{ display: "flex", gap: 4, marginBottom: 16, borderBottom: `1px solid ${C.b1}`, paddingBottom: 0 }}>
+          {[
+            { key: "pipeline", label: "Pipeline" },
+            { key: "buscar", label: "Oportunidades" },
+            { key: "pregoes", label: "Pregões" },
+            { key: "concorrentes", label: "Concorrentes" },
+            { key: "perfil", label: "Empresas" },
+          ].map(t => (
+            <button key={t.key} onClick={() => setTab(t.key)}
+              style={{
+                fontFamily: mono, fontSize: 11, padding: "8px 16px", cursor: "pointer", fontWeight: 600, border: "none",
+                borderBottom: tab === t.key ? `2px solid ${C.ac}` : "2px solid transparent",
+                background: "none", color: tab === t.key ? C.t1 : C.t3, marginBottom: -1,
+                textTransform: "uppercase", letterSpacing: 1,
+              }}>
+              {t.label}
             </button>
           ))}
         </div>
-      </div>
 
-      {/* Table */}
-      <div style={{ marginBottom: 32 }}>
-        <EditalTable editais={editais} onSelect={setSelectedPncpId} onRefresh={loadAll} />
-      </div>
+        {tab === "pipeline" && (
+          <>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12, flexWrap: "wrap", gap: 10 }}>
+              <div style={{ display: "flex", gap: 6 }}>
+                {filters.map(f => (
+                  <button key={f.key} onClick={() => setFilter(f.key)}
+                    style={{
+                      fontFamily: mono, fontSize: 10, padding: "5px 12px", borderRadius: 6, cursor: "pointer", fontWeight: 600,
+                      border: `1px solid ${filter === f.key ? C.b2 : C.b1}`,
+                      background: filter === f.key ? C.s3 : "transparent",
+                      color: filter === f.key ? C.t1 : C.t3,
+                    }}>
+                    {f.label} ({f.count})
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div style={{ marginBottom: 10 }}>
+              <input
+                placeholder="Buscar por orgao, objeto, empresa..."
+                value={searchText}
+                onChange={e => setSearchText(e.target.value)}
+                style={{
+                  width: "100%", padding: "8px 14px", boxSizing: "border-box", outline: "none",
+                  background: C.s2, border: `1px solid ${C.b1}`, borderRadius: 8,
+                  fontSize: 12, color: C.t1, fontFamily: mono,
+                }}
+              />
+            </div>
+            <div style={{ marginBottom: 24 }}>
+              <EditalTable editais={editais.filter(ed => {
+                if (!searchText.trim()) return true;
+                const s = searchText.toLowerCase();
+                return (ed.orgao_nome || "").toLowerCase().includes(s)
+                  || (ed.objeto || "").toLowerCase().includes(s)
+                  || (ed.empresa_sugerida || "").toLowerCase().includes(s)
+                  || (ed.uf || "").toLowerCase().includes(s);
+              })} onSelect={setSelectedPncpId} onRefresh={loadEditais} dark />
+            </div>
+          </>
+        )}
 
-      {/* Bottom grid */}
-      <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: 16, marginBottom: 24 }}>
-        <div style={{ border: "1px solid #EDEDEA", borderRadius: 12, padding: "20px 24px" }}>
-          <h3 style={{ fontSize: 15, fontWeight: 600, margin: "0 0 16px", color: "#1A1A18" }}>Editais por semana</h3>
-          <WeeklyChart data={weeklyData} />
-        </div>
-        <div style={{ border: "1px solid #EDEDEA", borderRadius: 12, padding: "20px 24px" }}>
-          <h3 style={{ fontSize: 15, fontWeight: 600, margin: "0 0 16px", color: "#1A1A18" }}>Concorrentes ativos</h3>
-          <ConcorrentePanel concorrentes={concorrentes} />
-        </div>
-      </div>
+        {tab === "buscar" && (
+          <PncpSearch onImported={() => { loadEditais(); setTab("pipeline"); }} />
+        )}
 
-      {/* Detail panel */}
-      {selectedPncpId && (
-        <EditalDetailPanel pncpId={selectedPncpId} onClose={() => setSelectedPncpId(null)} onRefresh={loadAll} />
-      )}
+        {tab === "pregoes" && (
+          <PregaoPanel editais={editais} />
+        )}
+
+        {tab === "concorrentes" && (
+          <ConcorrentePanel />
+        )}
+
+        {tab === "perfil" && (
+          <Perfil token="local" tenant={{ id: 1, nome_empresa: "Minha Empresa" }} />
+        )}
+
+        {selectedPncpId && (
+          <EditalDetailPanel pncpId={selectedPncpId} onClose={() => setSelectedPncpId(null)} onRefresh={loadEditais} />
+        )}
+      </div>
     </div>
   );
+}
+
+export default function App() {
+  return <Dashboard onLogout={() => {}} />;
 }

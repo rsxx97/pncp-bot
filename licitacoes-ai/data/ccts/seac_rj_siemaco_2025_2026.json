@@ -1,0 +1,98 @@
+{
+  "sindicato": "SEAC-RJ x SIEMACO-RIO",
+  "sindicato_patronal": "SEAC-RJ",
+  "sindicato_trabalhadores": "SIEMACO-RIO",
+  "uf": "RJ",
+  "registro_mte": "RJ001061/2025",
+  "vigencia": {
+    "inicio": "2025-03-01",
+    "fim": "2026-02-28"
+  },
+  "data_base": "01/03",
+  "categoria": "asseio_conservacao_limpeza",
+  "pisos_salariais": {
+    "servente_limpeza": 1698.11,
+    "lider_limpeza": 1953.82,
+    "encarregado_limpeza": 2377.35,
+    "encarregado": 2161.45,
+    "auxiliar_servicos_gerais": 1698.11,
+    "copeira": 1730.75,
+    "recepcionista": 1837.87,
+    "porteiro": 1730.75,
+    "ascensorista": 1730.75,
+    "jardineiro": 1698.11,
+    "auxiliar_manutencao": 1809.41,
+    "zelador": 1698.11,
+    "garcom": 2465.73,
+    "motorista": 2200.00,
+    "office_boy": 1518.00,
+    "auxiliar_administrativo": 1730.75,
+    "secretaria": 2250.19,
+    "telefonista": 1730.75,
+    "tecnico_administrativo": 2100.00,
+    "vigia": 1730.75,
+    "bombeiro_civil": 2465.73,
+    "eletricista": 2377.35,
+    "operador_caldeira": 2377.35
+  },
+  "beneficios": {
+    "vale_transporte": {
+      "valor_passagem": 4.70,
+      "passagens_dia": 2,
+      "dias_mes": 22,
+      "desconto_empregado_pct": 6.0
+    },
+    "vale_alimentacao": {
+      "valor_dia": 25.00,
+      "dias_mes": 22,
+      "desconto_empregado_pct": 10.0
+    },
+    "cesta_basica": {
+      "valor_mensal": 183.26,
+      "desconto_empregado": 0.0
+    },
+    "plano_saude": {
+      "valor_mensal": 200.00,
+      "tipo": "coparticipacao",
+      "obrigatorio": false
+    },
+    "seguro_vida": {
+      "valor_mensal": 15.00
+    }
+  },
+  "adicionais": {
+    "insalubridade": {
+      "base": "salario_minimo",
+      "grau_minimo_pct": 10.0,
+      "grau_medio_pct": 20.0,
+      "grau_maximo_pct": 40.0
+    },
+    "periculosidade_pct": 30.0,
+    "adicional_noturno_pct": 20.0,
+    "hora_noturna_reduzida": true
+  },
+  "provisoes": {
+    "aviso_previo_trabalhado_dias": 7,
+    "aviso_previo_indenizado_pct_demissao": 5.0,
+    "multa_fgts_pct": 40.0
+  },
+  "jornadas": {
+    "44h": {"horas_mes": 220, "divisor": 220},
+    "40h": {"horas_mes": 200, "divisor": 200},
+    "36h": {"horas_mes": 180, "divisor": 180},
+    "30h": {"horas_mes": 150, "divisor": 150},
+    "12x36": {"horas_mes": 180, "divisor": 180}
+  },
+  "uniformes_estimativa": {
+    "servente_limpeza": 85.00,
+    "encarregado": 95.00,
+    "copeira": 85.00,
+    "recepcionista": 100.00,
+    "secretaria": 90.00,
+    "garcom": 110.00,
+    "telefonista": 90.00,
+    "porteiro": 95.00,
+    "vigia": 120.00,
+    "padrao": 90.00
+  }
+}

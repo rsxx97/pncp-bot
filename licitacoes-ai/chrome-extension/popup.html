@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { width: 320px; font-family: 'Segoe UI', sans-serif; background: #09090B; color: #EEEEE8; padding: 16px; }
+    .header { display: flex; align-items: center; gap: 8px; margin-bottom: 16px; }
+    .header h1 { font-size: 14px; font-weight: 700; }
+    .header .badge { font-size: 10px; background: #BEFF3A; color: #09090B; padding: 2px 8px; border-radius: 4px; font-weight: 700; }
+    .status { background: #111114; border: 1px solid #2A2A32; border-radius: 8px; padding: 12px; margin-bottom: 12px; }
+    .status-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
+    .status-label { font-size: 11px; color: #5A5854; }
+    .status-value { font-size: 11px; color: #EEEEE8; font-weight: 600; }
+    .status-value.online { color: #2EDDA8; }
+    .status-value.offline { color: #FF4D4D; }
+    .btn { width: 100%; padding: 10px; border: none; border-radius: 8px; font-size: 12px; font-weight: 700; cursor: pointer; margin-bottom: 8px; }
+    .btn-primary { background: #BEFF3A; color: #09090B; }
+    .btn-secondary { background: #222228; color: #EEEEE8; }
+    .btn:hover { opacity: 0.9; }
+    .dados { background: #111114; border: 1px solid #2A2A32; border-radius: 8px; padding: 12px; margin-top: 8px; font-size: 11px; max-height: 200px; overflow-y: auto; }
+    .dados-item { padding: 4px 0; border-bottom: 1px solid #1A1A20; }
+    .dados-item:last-child { border-bottom: none; }
+    .empresa { color: #BEFF3A; }
+    .valor { color: #5A9EF7; font-family: monospace; }
+    .empty { color: #5A5854; text-align: center; padding: 20px 0; }
+    .link { color: #5A9EF7; text-decoration: none; font-size: 11px; display: block; text-align: center; margin-top: 8px; }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>Licitacoes AI</h1>
+    <span class="badge">EXTENSION</span>
+  </div>
+
+  <div class="status">
+    <div class="status-row">
+      <span class="status-label">Pagina</span>
+      <span class="status-value" id="pagina">—</span>
+    </div>
+    <div class="status-row">
+      <span class="status-label">Dashboard</span>
+      <span class="status-value" id="dashboard">verificando...</span>
+    </div>
+    <div class="status-row">
+      <span class="status-label">Ultima captura</span>
+      <span class="status-value" id="ultima">—</span>
+    </div>
+    <div class="status-row">
+      <span class="status-label">Dados capturados</span>
+      <span class="status-value" id="contagem">—</span>
+    </div>
+  </div>
+
+  <button class="btn btn-primary" id="capturar">Capturar Agora</button>
+  <button class="btn btn-secondary" id="abrir">Abrir Dashboard</button>
+
+  <div class="dados" id="dados">
+    <div class="empty">Nenhum dado capturado ainda. Abra um pregao no ComprasGov.</div>
+  </div>
+
+  <a href="http://localhost:8001" target="_blank" class="link">Abrir Dashboard Licitacoes AI</a>
+
+  <script src="popup.js"></script>
+</body>
+</html>

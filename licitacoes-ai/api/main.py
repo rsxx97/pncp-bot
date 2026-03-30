@@ -12,7 +12,7 @@ import sys
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from shared.database import init_db
-from api.routes import dashboard, editais, concorrentes, config
+from api.routes import dashboard, editais, concorrentes, config, auth, perfil, pregoes
 
 log = logging.getLogger("api")
 
@@ -33,6 +33,14 @@ app.include_router(dashboard.router)
 app.include_router(editais.router)
 app.include_router(concorrentes.router)
 app.include_router(config.router)
+app.include_router(auth.router)
+app.include_router(perfil.router)
+app.include_router(pregoes.router)
+
+
+@app.get("/api/health")
+def health():
+    return {"status": "ok", "service": "licitacoes-ai"}
 
 
 @app.on_event("startup")

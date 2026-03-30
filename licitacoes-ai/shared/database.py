@@ -163,6 +163,43 @@ CREATE TABLE IF NOT EXISTS comentarios (
 );
 
 CREATE INDEX IF NOT EXISTS idx_comentarios_pncp ON comentarios(pncp_id);
+
+-- Tenants (SaaS multi-tenant)
+CREATE TABLE IF NOT EXISTS tenants (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    nome_empresa TEXT NOT NULL,
+    cnpj TEXT UNIQUE,
+    email TEXT UNIQUE NOT NULL,
+    senha_hash TEXT NOT NULL,
+    plano TEXT DEFAULT 'free',
+    ativo BOOLEAN DEFAULT 1,
+    created_at TEXT DEFAULT (datetime('now')),
+    updated_at TEXT DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS tenant_empresas (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    tenant_id INTEGER NOT NULL REFERENCES tenants(id),
+    nome TEXT NOT NULL,
+    cnpj TEXT,
+    regime_tributario TEXT DEFAULT 'lucro_real',
+    desonerada BOOLEAN DEFAULT 0,
+    cprb_pct REAL DEFAULT 4.5,
+    rat_pct REAL DEFAULT 3.0,
+    fap REAL DEFAULT 1.0,
+    rat_ajustado_pct REAL DEFAULT 3.0,
+    pis_efetivo_pct REAL DEFAULT 1.65,
+    cofins_efetivo_pct REAL DEFAULT 7.6,
+    servicos_json TEXT DEFAULT '[]',
+    atestados_json TEXT DEFAULT '[]',
+    cnaes_json TEXT DEFAULT '[]',
+    uf_atuacao_json TEXT DEFAULT '["RJ"]',
+    restricoes_json TEXT DEFAULT '{}',
+    ativo BOOLEAN DEFAULT 1,
+    created_at TEXT DEFAULT (datetime('now'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_tenant_empresas_tenant ON tenant_empresas(tenant_id);
 """
 
 
@@ -488,3 +525,82 @@ def adicionar_comentario(pncp_id: str, texto: str, tipo: str = "anotacao", autor
     )
     conn.commit()
     return cur.lastrowid
+
+
+# ── CRUD: Tenants (SaaS) ──────────────────────────────────────────────
+
+def criar_tenant(nome_empresa: str, email: str, senha_hash: str, cnpj: str = None) -> int:
+    conn = get_db()
+    cur = conn.execute(
+        "INSERT INTO tenants (nome_empresa, cnpj, email, senha_hash) VALUES (?, ?, ?, ?)",
+        (nome_empresa, cnpj, email, senha_hash),
+    )
+    conn.commit()
+    return cur.lastrowid
+
+
+def get_tenant_by_email(email: str) -> dict | None:
+    conn = get_db()
+    row = conn.execute("SELECT * FROM tenants WHERE email = ?", (email,)).fetchone()
+    return dict(row) if row else None
+
+
+def get_tenant(tenant_id: int) -> dict | None:
+    conn = get_db()
+    row = conn.execute("SELECT * FROM tenants WHERE id = ?", (tenant_id,)).fetchone()
+    return dict(row) if row else None
+
+
+# ── CRUD: Tenant Empresas ──────────────────────────────────────────────
+
+def criar_tenant_empresa(tenant_id: int, data: dict) -> int:
+    conn = get_db()
+    cols = ["tenant_id"] + list(data.keys())
+    vals = [tenant_id] + [
+        json.dumps(v, ensure_ascii=False) if isinstance(v, (list, dict)) else v
+        for v in data.values()
+    ]
+    placeholders = ", ".join(["?"] * len(cols))
+    cur = conn.execute(
+        f"INSERT INTO tenant_empresas ({', '.join(cols)}) VALUES ({placeholders})", vals
+    )
+    conn.commit()
+    return cur.lastrowid
+
+
+def get_tenant_empresas(tenant_id: int) -> list[dict]:
+    conn = get_db()
+    rows = conn.execute(
+        "SELECT * FROM tenant_empresas WHERE tenant_id = ? AND ativo = 1", (tenant_id,)
+    ).fetchall()
+    result = []
+    for r in rows:
+        d = dict(r)
+        for field in ("servicos_json", "atestados_json", "cnaes_json", "uf_atuacao_json", "restricoes_json"):
+            if d.get(field):
+                try:
+                    d[field] = json.loads(d[field])
+                except (json.JSONDecodeError, TypeError):
+                    pass
+        result.append(d)
+    return result
+
+
+def atualizar_tenant_empresa(empresa_id: int, data: dict):
+    conn = get_db()
+    sets = []
+    vals = []
+    for k, v in data.items():
+        if isinstance(v, (list, dict)):
+            v = json.dumps(v, ensure_ascii=False)
+        sets.append(f"{k} = ?")
+        vals.append(v)
+    vals.append(empresa_id)
+    conn.execute(f"UPDATE tenant_empresas SET {', '.join(sets)} WHERE id = ?", vals)
+    conn.commit()
+
+
+def deletar_tenant_empresa(empresa_id: int):
+    conn = get_db()
+    conn.execute("UPDATE tenant_empresas SET ativo = 0 WHERE id = ?", (empresa_id,))
+    conn.commit()

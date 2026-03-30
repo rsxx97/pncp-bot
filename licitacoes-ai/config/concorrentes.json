@@ -1,28 +1,28 @@
 {
   "concorrentes": [
     {
-      "cnpj": "PREENCHER",
-      "razao_social": "Nova Rio Serviços Gerais Ltda",
+      "cnpj": "29.212.545/0001-43",
+      "razao_social": "Nova Rio Servicos Gerais Ltda",
       "nome_fantasia": "Nova Rio",
-      "segmentos": ["limpeza", "conservação", "facilities"],
+      "segmentos": ["limpeza", "conservação", "facilities", "manutenção predial", "paisagismo"],
       "uf_principal": "RJ",
-      "notas": "Maior concorrente em limpeza no RJ. Muito agressivo em preço."
+      "notas": "Maior concorrente em limpeza no RJ. +5.000 funcionários. 40 anos de mercado. ISO 9001/14001/45001. Muito agressiva em preço."
     },
     {
-      "cnpj": "PREENCHER",
-      "razao_social": "Personal Service Recursos Humanos e Assessoria Empresarial",
+      "cnpj": "00.277.106/0001-37",
+      "razao_social": "Personal Service Recursos Humanos e Assessoria Empresarial Ltda",
       "nome_fantasia": "Personal Service",
-      "segmentos": ["apoio administrativo", "recepção", "limpeza"],
+      "segmentos": ["apoio administrativo", "recepção", "limpeza", "terceirização", "portaria"],
       "uf_principal": "RJ",
-      "notas": "Forte em terceirização administrativa."
+      "notas": "Forte em terceirização administrativa. Sede Duque de Caxias/RJ. Filiais RJ, MG, SP, SC. Capital social R$301M."
     },
     {
-      "cnpj": "PREENCHER",
-      "razao_social": "MGS Clean Serviços Ltda",
+      "cnpj": "19.088.605/0001-04",
+      "razao_social": "MGS Clean Soluções e Serviços Ltda",
       "nome_fantasia": "MGS Clean",
-      "segmentos": ["limpeza", "conservação"],
+      "segmentos": ["limpeza", "conservação", "manutenção predial"],
       "uf_principal": "RJ",
-      "notas": "Empresa menor, costuma ser agressiva em pregões de menor porte."
+      "notas": "Empresa de médio porte. Sede Barra da Tijuca/RJ. Agressiva em pregões menores. Fundada em 2013."
     },
     {
       "cnpj": "PREENCHER",
@@ -30,15 +30,17 @@
       "nome_fantasia": "FERTHYMAR",
       "segmentos": ["limpeza", "facilities"],
       "uf_principal": "RJ",
-      "notas": "Concorrente frequente em pregões estaduais RJ."
+      "notas": "Concorrente frequente em pregões estaduais RJ. CNPJ pendente — verificar em resultados de pregões no PNCP."
     },
     {
-      "cnpj": "PREENCHER",
+      "cnpj": "60.398.138/0001-08",
       "razao_social": "GPS Participações e Empreendimentos S.A.",
       "nome_fantasia": "Grupo GPS",
-      "segmentos": ["limpeza", "segurança", "facilities", "logística"],
+      "segmentos": ["limpeza", "segurança", "facilities", "logística", "manutenção"],
       "uf_principal": "SP",
-      "notas": "Maior grupo do Brasil em facilities. Entra em licitações grandes (>R$10M)."
+      "notas": "Maior grupo do Brasil em facilities. B3: GGPS3. +120 mil funcionários. Entra em licitações >R$10M."
     }
-  ]
+  ],
+  "_atualizado_em": "2026-03-23",
+  "_nota": "CNPJs de fontes públicas (Receita Federal). FERTHYMAR pendente."
 }

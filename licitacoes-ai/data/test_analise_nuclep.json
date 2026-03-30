@@ -1,0 +1,135 @@
+{
+  "objeto_resumido": "Contratação de empresa especializada em serviços continuados de limpeza predial para prédios da fábrica NUCLEP (Itaguaí-RJ) e escritório (Rio de Janeiro-RJ), incluindo terminal marítimo, conforme IN SEGES/MPDG 05/2017",
+  "valor_estimado": null,
+  "prazo_contrato_meses": null,
+  "local_execucao": "Itaguaí-RJ e Rio de Janeiro-RJ",
+  "portal_origem": "ComprasNet",
+  "postos_trabalho": [
+    {
+      "funcao": "Auxiliar de Serviços Gerais / Servente de Limpeza",
+      "cbo": "5143-20",
+      "quantidade": null,
+      "jornada": "44h",
+      "salario_base": null,
+      "adicional_insalubridade_pct": 0,
+      "adicional_periculosidade_pct": 0,
+      "adicional_noturno": false,
+      "descricao": "Responsável por limpeza, conservação e higienização dos prédios da fábrica, terminal marítimo e escritório. Deve cumprir produtividade mínima conforme ANEXO VI-B da IN 05/2017. Trabalha em áreas que podem incluir galpões com exigência de uniforme em brim/algodão e botas com biqueira de aço"
+    },
+    {
+      "funcao": "Encarregado de Limpeza",
+      "cbo": null,
+      "quantidade": null,
+      "jornada": "44h",
+      "salario_base": null,
+      "adicional_insalubridade_pct": 0,
+      "adicional_periculosidade_pct": 0,
+      "adicional_noturno": false,
+      "descricao": "Responsável pela supervisão, coordenação e execução das atividades de limpeza. Deve ter autonomia para pequenas tarefas administrativas e provisão de materiais na Nuclep"
+    }
+  ],
+  "cct": {
+    "sindicato_patronal": "SEAC ou SINDEPRESTEM (aplicável a Itaguaí-RJ)",
+    "sindicato_laboral": "SIEMACO-RJ ou equivalente para categoria Asseio e Conservação",
+    "categoria": "limpeza",
+    "pisos_mencionados": [],
+    "beneficios": {
+      "vale_alimentacao": null,
+      "vale_transporte": "Obrigatório se empregado não optar por não recebê-lo por escrito",
+      "cesta_basica": null,
+      "beneficio_social_familiar": null,
+      "seguro_vida": null,
+      "assistencia_medica": null
+    }
+  },
+  "materiais_insumos": [
+    {
+      "item": "Uniformes completos (calça, camisa com emblema, meia algodão, bota couro)",
+      "unidade": "conjunto",
+      "qtd_mensal": null,
+      "valor_estimado": null,
+      "observacao": "2 conjuntos completos por empregado no início + substituição a cada 6 meses. Para áreas internas: tecido brim/algodão obrigatório com botas biqueira aço"
+    },
+    {
+      "item": "Toalhas de banho e rosto (banheiros Diretores e Presidente)",
+      "unidade": "conjunto",
+      "qtd_mensal": null,
+      "valor_estimado": null,
+      "observacao": "1 toalha banho + 2 toalhas rosto por banheiro - fornecimento, limpeza, lavagem e passagem pela Contratada"
+    },
+    {
+      "item": "Produtos e insumos de limpeza",
+      "unidade": "diversos",
+      "qtd_mensal": null,
+      "valor_estimado": null,
+      "observacao": "Conforme ANEXO V do TR - fornecimento total pela Contratada com substituição em 48h se defeituoso"
+    },
+    {
+      "item": "Equipamentos de Proteção Individual (EPI)",
+      "unidade": "diversos",
+      "qtd_mensal": null,
+      "valor_estimado": null,
+      "observacao": "Conforme legislação NR-6 e especificidades das atividades insalubres/perigosas"
+    },
+    {
+      "item": "Estufa para refeições (se oferecer vale-refeição/alimentação)",
+      "unidade": "unidade",
+      "qtd_mensal": null,
+      "valor_estimado": null,
+      "observacao": "Fornecimento e manutenção pela Contratada se aplicável"
+    },
+    {
+      "item": "Materiais e equipamentos de escritório",
+      "unidade": "diversos",
+      "qtd_mensal": null,
+      "valor_estimado": null,
+      "observacao": "Manutenção de equipamentos, insumos e materiais para autonomia de encarregados e equipe em pequenas tarefas administrativas"
+    }
+  ],
+  "habilitacao": {
+    "atestados_tecnicos": [
+      "Atestado de capacidade técnica de empresa especializada em serviços de limpeza predial",
+      "Experiência em execução de serviços de limpeza em complexos industriais/fabris"
+    ],
+    "qualificacao_economica": [
+      "Capital social mínimo (conforme regulamento NUCLEP)",
+      "Índices de liquidez e solvência"
+    ],
+    "exige_visita_tecnica": true,
+    "exige_garantia_proposta": null,
+    "valor_garantia": null
+  },
+  "sat_rat_pct": 2,
+  "iss_municipio_pct": 5,
+  "riscos": [
+    "Edital refere ANEXO IV e ANEXO V (quadro de postos e materiais) não fornecidos nesta extração - quantidade real de postos indeterminada",
+    "Valor estimado não informado no edital fornecido",
+    "Prazo contratual não especificado no segmento do edital disponibilizado",
+    "Possível insalubridade/periculosidade não quantificada - TR menciona laudo técnico que pode ensejar adicionais via aditivo contratual",
+    "Convenção Coletiva a ser aplicada deve ser específica de Asseio e Conservação com abrangência em Itaguaí-RJ - não identificada nesta análise",
+    "Exame ocupacional (ASO) a cada 6 meses para postos insalubres exigido - custo elevado não previsto",
+    "Produtividade mínima exigida conforme IN 05/2017 ANEXO VI-B - índices não mencionados neste recorte"
+  ],
+  "oportunidades": [
+    "Objeto bem estruturado em pregão eletrônico com transparência de processo",
+    "Legislação clara (Lei 13.303/2016, Lei Complementar 123/06)",
+    "Beneficiário potencial: ME/EPP/COOP com margem de preferência de até 5%",
+    "Contrato por continuidade - previsibilidade de fluxo",
+    "Vistoria técnica obrigatória antes de propostas - permite dimensionamento preciso",
+    "TR estruturado com referência à IN 05/2017 - indica critérios objetivos de avaliação"
+  ],
+  "parecer": "go_com_ressalvas",
+  "motivo_parecer": "Licitação estruturada conforme marco legal (Lei 13.303/2016 + IN 05/2017), com objeto bem definido e procedimento eletrônico transparente. Entretanto, dados críticos para construção de planilha de custos estão ausentes neste recorte: ANEXO IV (quadro de postos com quantidades), ANEXO V (especificação de materiais/insumos), valor estimado e prazo contratual. A análise técnica completa requer acesso a esses documentos anexados.",
+  "ressalvas": [
+    "CRÍTICO: ANEXO IV não fornecido - impossível determinar quantidade exata de postos de trabalho por cargo e jornada. A extração indica genéricos de Auxiliar de Serviços Gerais e Encarregado em 44h, mas quantidade = null",
+    "CRÍTICO: ANEXO V não fornecido - especificação completa de materiais/insumos indisponível para composição de custos",
+    "Valor estimado não consta do segmento de edital disponibilizado - impossível validar proposta contra parâmetro",
+    "Prazo contratual não informado - necessário para cálculo de custo total e repactuação",
+    "Convenção Coletiva de Asseio e Conservação aplicável a Itaguaí-RJ não identificada - pisos salariais não extraídos",
+    "Laudo Técnico de Insalubridade e Periculosidade existente na NUCLEP não fornecido - percentuais de adicionais (20%/40% insalubridade, 30% periculosidade) não confirmados",
+    "Produtividade mínima (m²/jornada) não especificada neste recorte - verificar ANEXO VI-B IN 05/2017",
+    "ISS de Itaguaí-RJ estimado em 5%, mas deve ser confirmado conforme lei municipal específica",
+    "SAT/RAT estimado em 2% (risco leve a médio em limpeza) - deve ser validado com histórico da contratada",
+    "Exigência de ASO a cada 6 meses para postos insalubres eleva custos com saúde ocupacional - impacto significativo não quantificado"
+  ]
+}

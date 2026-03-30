@@ -1,0 +1,37 @@
+{
+  "manifest_version": 3,
+  "name": "Licitacoes AI - Compras.gov.br",
+  "version": "1.0.0",
+  "description": "Captura dados de pregoes do ComprasGov em tempo real e envia para o dashboard Licitacoes AI",
+  "permissions": ["storage", "activeTab"],
+  "host_permissions": [
+    "https://cnetmobile.estaleiro.serpro.gov.br/*",
+    "http://localhost:8001/*"
+  ],
+  "content_scripts": [
+    {
+      "matches": [
+        "https://cnetmobile.estaleiro.serpro.gov.br/comprasnet-web/*",
+        "https://cnetmobile.estaleiro.serpro.gov.br/*"
+      ],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_icon": {
+      "16": "icon16.png",
+      "48": "icon48.png",
+      "128": "icon128.png"
+    }
+  },
+  "background": {
+    "service_worker": "background.js"
+  },
+  "icons": {
+    "16": "icon16.png",
+    "48": "icon48.png",
+    "128": "icon128.png"
+  }
+}
