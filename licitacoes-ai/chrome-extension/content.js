@@ -171,70 +171,65 @@ function extrairComprasGov() {
   const pregaoMatch = bodyText.match(/N[°º]?\s*(\d+\/\d{4})/);
   if (pregaoMatch) dados.numero_pregao = pregaoMatch[1];
 
-  // PARSER PRINCIPAL: split por CNPJ
-  // Cada empresa aparece como bloco: "CNPJ [badges] [status] NOME UF Valor ofertado ... R$ X.XXX,XX"
-  const blocos = bodyText.split(/(?=\d{2}\.\d{3}\.\d{3}\/\d{4}-\d{2})/);
+  // PARSER: encontra todos os CNPJs e extrai dados do bloco após cada um
+  const cnpjPattern = /\d{2}\.\d{3}\.\d{3}\/\d{4}-\d{2}/g;
+  const cnpjs = [];
+  let m;
+  while ((m = cnpjPattern.exec(bodyText)) !== null) {
+    cnpjs.push({ cnpj: m[0], index: m.index });
+  }
+
   let pos = 1;
   let nossaPosicao = null;
   let nossoLance = null;
 
-  for (const bloco of blocos) {
-    // 1. CNPJ
-    const cnpjMatch = bloco.match(/^(\d{2}\.\d{3}\.\d{3}\/\d{4}-\d{2})/);
-    if (!cnpjMatch) continue;
-    const cnpj = cnpjMatch[1];
+  for (let i = 0; i < cnpjs.length; i++) {
+    const { cnpj, index: startIdx } = cnpjs[i];
+    const endIdx = i + 1 < cnpjs.length ? cnpjs[i + 1].index : startIdx + 600;
+    const bloco = bodyText.substring(startIdx, endIdx);
 
-    // 2. Valor (R$ X.XXX,XX)
-    const valorMatch = bloco.match(/R\$\s*([\d.,]+)/);
-    if (!valorMatch) continue;
-    const valor = parseValor(valorMatch[1]);
+    // Valor: busca "R$ " seguido de números
+    const valorIdx = bloco.indexOf("R$ ");
+    if (valorIdx === -1) continue;
+    const valorStr = bloco.substring(valorIdx + 3, valorIdx + 25).match(/^[\d.,]+/);
+    if (!valorStr) continue;
+    const valor = parseValor(valorStr[0]);
     if (!valor || valor < 100) continue;
 
-    // 3. Status habilitação
-    const isInabilitada = /Inabilitada/i.test(bloco);
-    const isDesclassificada = /Desclassificada/i.test(bloco);
-    const isAceita = /Aceita/i.test(bloco);
-    const habilitado = !isInabilitada && !isDesclassificada;
-    let statusText = isInabilitada ? "Inabilitada" : isDesclassificada ? "Desclassificada" : isAceita ? "Aceita e habilitada" : "";
+    // Status habilitação
+    const habilitado = !bloco.includes("Inabilitada") && !bloco.includes("Desclassificada");
+    const statusText = bloco.includes("Inabilitada") ? "Inabilitada" : bloco.includes("Desclassificada") ? "Desclassificada" : bloco.includes("Aceita") ? "Aceita" : "";
 
-    // 4. Nome da empresa — texto entre badges/status e UF (2 letras antes de "Valor")
+    // Nome: texto entre CNPJ e "UF Valor"
     let empresa = "";
-    // Remove CNPJ do início
-    let rest = bloco.substring(cnpj.length).trim();
-    // Remove badges
-    rest = rest.replace(/ME\/EPP/g, "").replace(/Programa de integridade/g, "").replace(/Equidade de g[êe]nero \([^)]+\)/g, "");
-    // Remove status
-    rest = rest.replace(/Inabilitada|Desclassificada|Aceita e habilitada|Aceita/gi, "");
-    // Pega texto até "UF Valor"
-    const nomeMatch = rest.match(/^\s*([A-ZÀ-Ú0-9][A-ZÀ-Ú0-9\s\.\-\/&,()]+?)\s+[A-Z]{2}\s+Valor/);
-    if (nomeMatch) {
-      empresa = nomeMatch[1].trim();
-    }
-    // Fallback: pega tudo antes de "Valor"
-    if (!empresa) {
-      const fb = rest.match(/^\s*(.+?)\s+Valor/);
-      if (fb) {
-        empresa = fb[1].replace(/\s+[A-Z]{2}\s*$/, "").trim();
-      }
+    const afterCnpj = bloco.substring(cnpj.length);
+    // Remove badges e status
+    let clean = afterCnpj;
+    ["ME/EPP", "Programa de integridade", "Inabilitada", "Desclassificada", "Aceita e habilitada", "Aceita"].forEach(badge => {
+      clean = clean.split(badge).join("");
+    });
+    // Remove equidade
+    clean = clean.replace(/Equidade[^A-Z]*/g, "");
+    // Pega até "Valor"
+    const valorPos = clean.indexOf("Valor");
+    if (valorPos > 0) {
+      let nome = clean.substring(0, valorPos).trim();
+      // Remove UF no final (2 letras)
+      nome = nome.replace(/\s+[A-Z]{2}\s*$/, "").trim();
+      empresa = nome;
     }
 
     if (!empresa || empresa.length < 3) continue;
 
-    // 5. Detecta se é nossa empresa
-    const isNosso = /MANUTEC|MIAMI/i.test(empresa);
+    const isNosso = empresa.toUpperCase().includes("MANUTEC") || empresa.toUpperCase().includes("MIAMI");
     if (isNosso) {
       nossaPosicao = pos;
       nossoLance = valor;
     }
 
     dados.classificacao.push({
-      posicao: pos++,
-      cnpj,
-      empresa: empresa.substring(0, 100),
-      valor_lance_final: valor,
-      habilitado,
-      status: statusText,
-      nosso: isNosso,
+      posicao: pos++, cnpj, empresa: empresa.substring(0, 100),
+      valor_lance_final: valor, habilitado, status: statusText, nosso: isNosso,
     });
   }
 
