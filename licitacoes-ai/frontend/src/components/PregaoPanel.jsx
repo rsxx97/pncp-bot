@@ -227,23 +227,32 @@ function PregaoDetalhe({ pregaoId, onBack }) {
       </div>
 
       {/* Cards de info */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 10, marginBottom: 20 }}>
-        {[
-          { label: "UASG", value: pregao.uasg || "—" },
-          { label: "Portal", value: (pregao.edital_portal || pregao.portal || "—").toUpperCase() },
-          { label: "Sessão", value: `${pregao.data_sessao || "—"} ${pregao.hora_sessao || ""}` },
-          { label: "Proposta", value: formatBRL(pregao.valor_proposta) },
-          { label: "Lance Final", value: formatBRL(pregao.lance_final) },
-          { label: "Posição", value: pregao.posicao_final ? `${pregao.posicao_final}º de ${pregao.total_participantes || "?"}` : "—" },
-          { label: "Vencedor", value: pregao.vencedor_nome || "—" },
-          { label: "Valor Vencedor", value: formatBRL(pregao.vencedor_valor) },
-        ].map((c, i) => (
-          <div key={i} style={{ background: D.s1, border: `1px solid ${D.b1}`, borderRadius: 8, padding: "10px 12px" }}>
-            <div style={{ fontFamily: mono, fontSize: 9, color: D.t3, textTransform: "uppercase", marginBottom: 4 }}>{c.label}</div>
-            <div style={{ fontFamily: mono, fontSize: 13, fontWeight: 600, color: D.t1 }}>{c.value}</div>
+      {(() => {
+        const valEst = pregao.valor_estimado || 0;
+        const descVencedor = valEst && pregao.vencedor_valor ? ((1 - pregao.vencedor_valor / valEst) * 100).toFixed(1) + "%" : "—";
+        const descNosso = valEst && pregao.lance_final ? ((1 - pregao.lance_final / valEst) * 100).toFixed(1) + "%" : "—";
+        return (
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))", gap: 8, marginBottom: 20 }}>
+            {[
+              { label: "Valor Estimado", value: formatBRL(valEst), color: D.t1 },
+              { label: "Nossa Empresa", value: pregao.nossa_empresa || "—", color: D.ac },
+              { label: "Nosso Lance", value: formatBRL(pregao.lance_final), color: D.ac },
+              { label: "Nossa Posição", value: pregao.posicao_final ? `${pregao.posicao_final}º / ${pregao.total_participantes || "?"}` : "—", color: D.am },
+              { label: "Nosso Desconto", value: descNosso, color: D.tl },
+              { label: "Vencedor", value: pregao.vencedor_nome?.substring(0, 25) || "—", color: pregao.vencedor_nome?.includes("MANUTEC") || pregao.vencedor_nome?.includes("MIAMI") ? D.ac : D.t1 },
+              { label: "Valor Vencedor", value: formatBRL(pregao.vencedor_valor), color: D.t1 },
+              { label: "Desc. Vencedor", value: descVencedor, color: D.tl },
+              { label: "UASG", value: pregao.uasg || "—", color: D.t2 },
+              { label: "Portal", value: (pregao.edital_portal || pregao.portal || "—").toUpperCase(), color: D.bl },
+            ].map((c, i) => (
+              <div key={i} style={{ background: D.s1, border: `1px solid ${D.b1}`, borderRadius: 8, padding: "8px 10px" }}>
+                <div style={{ fontFamily: mono, fontSize: 8, color: D.t3, textTransform: "uppercase", marginBottom: 3, letterSpacing: 0.5 }}>{c.label}</div>
+                <div style={{ fontFamily: mono, fontSize: 12, fontWeight: 600, color: c.color, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.value}</div>
+              </div>
+            ))}
           </div>
-        ))}
-      </div>
+        );
+      })()}
 
       {/* Ações de Status */}
       <div style={{ display: "flex", gap: 6, marginBottom: 20, flexWrap: "wrap" }}>
