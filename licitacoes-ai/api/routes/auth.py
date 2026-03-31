@@ -96,14 +96,9 @@ def register(body: RegisterRequest):
         cnpj=body.cnpj,
     )
 
-    token = _gerar_token(tenant_id)
     return {
-        "token": token,
-        "tenant": {
-            "id": tenant_id,
-            "nome_empresa": body.nome_empresa,
-            "email": body.email,
-        },
+        "message": "Cadastro realizado! Aguarde aprovação do administrador.",
+        "pendente": True,
     }
 
 
@@ -118,6 +113,12 @@ def login(body: LoginRequest):
     if not tenant["ativo"]:
         raise HTTPException(403, "Conta desativada")
 
+    # Verifica aprovação
+    conn = get_connection()
+    row = conn.execute("SELECT aprovado FROM tenants WHERE id = ?", (tenant["id"],)).fetchone()
+    if row and not row["aprovado"]:
+        raise HTTPException(403, "Cadastro pendente de aprovação. Entre em contato com o administrador.")
+
     token = _gerar_token(tenant["id"])
     return {
         "token": token,
@@ -128,6 +129,34 @@ def login(body: LoginRequest):
             "plano": tenant["plano"],
         },
     }
+
+
+# ── Admin: aprovar/rejeitar usuários ──
+
+@router.get("/pendentes")
+def listar_pendentes():
+    """Lista usuários aguardando aprovação."""
+    conn = get_connection()
+    rows = conn.execute("SELECT id, nome_empresa, email, cnpj, criado_em FROM tenants WHERE aprovado = 0 AND ativo = 1").fetchall()
+    return [dict(r) for r in rows]
+
+
+@router.post("/aprovar/{tenant_id}")
+def aprovar_usuario(tenant_id: int):
+    """Aprova um usuário pendente."""
+    conn = get_connection()
+    conn.execute("UPDATE tenants SET aprovado = 1 WHERE id = ?", (tenant_id,))
+    conn.commit()
+    return {"ok": True, "message": "Usuário aprovado"}
+
+
+@router.post("/rejeitar/{tenant_id}")
+def rejeitar_usuario(tenant_id: int):
+    """Rejeita/desativa um usuário."""
+    conn = get_connection()
+    conn.execute("UPDATE tenants SET ativo = 0 WHERE id = ?", (tenant_id,))
+    conn.commit()
+    return {"ok": True, "message": "Usuário rejeitado"}
 
 
 @router.get("/me")

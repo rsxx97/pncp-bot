@@ -1271,3 +1271,4 @@
 30/03/2026 14:02:01 [WARNING] Tentativa 1 falhou (mod=6, pag=193): HTTPSConnectionPool(host='pncp.gov.br', port=443): Read timed out. (read timeout=90)
 30/03/2026 14:02:09 [INFO] Nacional: 0 nova(s)
 30/03/2026 14:02:09 [INFO] Nenhuma nova oportunidade encontrada.
+31/03/2026 11:00:04 [INFO] Iniciando busca. 268 licitações já enviadas.

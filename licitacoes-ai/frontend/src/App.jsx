@@ -7,6 +7,7 @@ import PncpSearch from "./components/PncpSearch";
 import Perfil from "./components/Perfil";
 import ConcorrentePanel from "./components/ConcorrentePanel";
 import PregaoPanel from "./components/PregaoPanel";
+import Login from "./components/Login";
 
 const C = {
   bg: "#09090B", s1: "#111114", s2: "#18181C", s3: "#222228",
@@ -182,5 +183,28 @@ function Dashboard({ onLogout }) {
 }
 
 export default function App() {
-  return <Dashboard onLogout={() => {}} />;
+  const [token, setToken] = useState(() => localStorage.getItem("token"));
+  const [tenant, setTenant] = useState(() => {
+    try { return JSON.parse(localStorage.getItem("tenant")); } catch { return null; }
+  });
+
+  const handleLogin = (data) => {
+    localStorage.setItem("token", data.token);
+    localStorage.setItem("tenant", JSON.stringify(data.tenant));
+    setToken(data.token);
+    setTenant(data.tenant);
+  };
+
+  const handleLogout = () => {
+    localStorage.removeItem("token");
+    localStorage.removeItem("tenant");
+    setToken(null);
+    setTenant(null);
+  };
+
+  if (!token) {
+    return <Login onLogin={handleLogin} />;
+  }
+
+  return <Dashboard onLogout={handleLogout} />;
 }
