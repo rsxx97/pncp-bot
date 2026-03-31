@@ -1,18 +1,61 @@
 {
   "manifest_version": 3,
-  "name": "Licitacoes AI - Compras.gov.br",
-  "version": "1.0.0",
-  "description": "Captura dados de pregoes do ComprasGov em tempo real e envia para o dashboard Licitacoes AI",
+  "name": "Licitacoes AI - Multi-Portal",
+  "version": "2.0.0",
+  "description": "Captura dados de pregoes em tempo real de todos os portais de licitacao do Brasil",
   "permissions": ["storage", "activeTab"],
   "host_permissions": [
     "https://cnetmobile.estaleiro.serpro.gov.br/*",
+    "https://*.comprasnet.gov.br/*",
+    "https://*.compras.gov.br/*",
+    "https://*.compras.rj.gov.br/*",
+    "https://*.siga.rj.gov.br/*",
+    "https://*.fazenda.rj.gov.br/*",
+    "https://*.licitacoes-e.com.br/*",
+    "https://licitacoes-e2.bb.com.br/*",
+    "https://*.bllcompras.com/*",
+    "https://*.bll.org.br/*",
+    "https://*.portaldecompraspublicas.com.br/*",
     "https://pncp-bot-production.up.railway.app/*"
   ],
   "content_scripts": [
     {
       "matches": [
-        "https://cnetmobile.estaleiro.serpro.gov.br/comprasnet-web/*",
-        "https://cnetmobile.estaleiro.serpro.gov.br/*"
+        "https://cnetmobile.estaleiro.serpro.gov.br/*",
+        "https://*.comprasnet.gov.br/*",
+        "https://*.compras.gov.br/*"
+      ],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "https://*.compras.rj.gov.br/*",
+        "https://*.siga.rj.gov.br/*",
+        "https://*.fazenda.rj.gov.br/*"
+      ],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "https://*.licitacoes-e.com.br/*",
+        "https://licitacoes-e2.bb.com.br/*"
+      ],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "https://*.bllcompras.com/*",
+        "https://*.bll.org.br/*"
+      ],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "https://*.portaldecompraspublicas.com.br/*"
       ],
       "js": ["content.js"],
       "run_at": "document_idle"
