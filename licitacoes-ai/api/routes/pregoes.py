@@ -356,6 +356,90 @@ def listar_portais():
     return listar_portais_status()
 
 
+# ── Sync da extensão Chrome ──
+
+@router.post("/extension/sync")
+def extension_sync(body: dict):
+    """Recebe dados capturados pela extensão Chrome de qualquer portal."""
+    conn = get_connection()
+
+    portal = body.get("portal", "desconhecido")
+    compra_id = body.get("compra_id", "")
+    classificacao = body.get("classificacao", [])
+    lances = body.get("lances", [])
+    mensagens = body.get("mensagens", [])
+    propostas = body.get("propostas", [])
+
+    saved = {"classificacao": 0, "lances": 0, "mensagens": 0}
+
+    # Tenta achar pregão pelo compra_id ou URL
+    pregao = None
+    if compra_id:
+        # Busca por compra_id no campo link_portal ou observacoes
+        pregao = conn.execute("SELECT id FROM pregoes WHERE link_portal LIKE ? OR observacoes LIKE ? LIMIT 1",
+                              (f"%{compra_id}%", f"%{compra_id}%")).fetchone()
+
+    # Se não achou, pega o último pregão ativo
+    if not pregao:
+        pregao = conn.execute("SELECT id FROM pregoes WHERE status NOT IN ('homologado','contrato','fracassado') ORDER BY updated_at DESC LIMIT 1").fetchone()
+
+    # Se ainda não tem pregão, salva os dados no storage temporário
+    if not pregao:
+        # Salva como evento no banco para não perder
+        from datetime import datetime
+        conn.execute("""INSERT INTO pregao_eventos (pregao_id, tipo, descricao, data_hora)
+            VALUES (0, 'extension_sync', ?, ?)""",
+            (json.dumps({"portal": portal, "compra_id": compra_id, "classificacao": len(classificacao), "lances": len(lances), "mensagens": len(mensagens)}, ensure_ascii=False),
+             datetime.now().isoformat()))
+        conn.commit()
+        return {"ok": True, "pregao_id": None, "saved": saved, "message": f"Dados recebidos de {portal} mas nenhum pregão ativo encontrado. {len(classificacao)} empresas, {len(lances)} lances, {len(mensagens)} mensagens."}
+
+    pregao_id = pregao["id"]
+
+    # Salva classificação
+    if classificacao:
+        for emp in classificacao:
+            existing = conn.execute("SELECT id FROM pregao_classificacao WHERE pregao_id = ? AND cnpj = ?",
+                                    (pregao_id, emp.get("cnpj"))).fetchone()
+            if not existing:
+                conn.execute("""INSERT INTO pregao_classificacao (pregao_id, posicao, empresa, cnpj, valor_lance_final, habilitado)
+                    VALUES (?, ?, ?, ?, ?, ?)""",
+                    (pregao_id, emp.get("posicao", 0), emp.get("empresa", ""), emp.get("cnpj"),
+                     emp.get("valor_lance_final"), 1 if emp.get("habilitado", True) else 0))
+                saved["classificacao"] += 1
+
+    # Salva lances
+    if lances:
+        for lance in lances:
+            conn.execute("INSERT INTO lances (pregao_id, empresa, valor, horario, nosso) VALUES (?, ?, ?, ?, 0)",
+                (pregao_id, lance.get("empresa", ""), lance.get("valor"), lance.get("horario")))
+            saved["lances"] += 1
+
+    # Salva mensagens
+    if mensagens:
+        for msg in mensagens:
+            conn.execute("INSERT INTO chat_pregao (pregao_id, remetente, mensagem, horario) VALUES (?, ?, ?, ?)",
+                (pregao_id, msg.get("remetente", "sistema"), msg.get("mensagem", ""), msg.get("horario")))
+            saved["mensagens"] += 1
+
+    # Atualiza vencedor se tiver classificação
+    if classificacao and len(classificacao) > 0:
+        vencedor = classificacao[0]
+        conn.execute("""UPDATE pregoes SET vencedor_nome = ?, vencedor_valor = ?, total_participantes = ?,
+            updated_at = datetime('now') WHERE id = ?""",
+            (vencedor.get("empresa"), vencedor.get("valor_lance_final"), len(classificacao), pregao_id))
+
+    conn.commit()
+
+    return {
+        "ok": True,
+        "pregao_id": pregao_id,
+        "portal": portal,
+        "saved": saved,
+        "message": f"Portal {portal}: {saved['classificacao']} empresas, {saved['lances']} lances, {saved['mensagens']} mensagens salvos.",
+    }
+
+
 # ── Classificação ──
 
 class ClassificacaoCreate(BaseModel):
