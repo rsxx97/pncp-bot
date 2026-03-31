@@ -275,7 +275,57 @@ function extrairComprasGov() {
   const tetoMatch = bodyText.match(/Valor estimado[^R]*R\$\s*([\d.,]+)/);
   if (tetoMatch) dados.valor_teto = parseValor(tetoMatch[1]);
 
-  console.log(`[LicitacoesAI] ComprasGov: ${dados.classificacao.length} empresas capturadas. Nossa posição: ${nossaPosicao || "não encontrada"}`);
+  // CAPTURA CHAT: busca mensagens em accordions expandidos e seções de chat
+  document.querySelectorAll('[class*="chat"], [class*="mensagem"], [class*="msg-"], [class*="timeline"], [class*="historico"]').forEach(el => {
+    const text = el.innerText.trim();
+    if (text.length > 5 && text.length < 3000 && !text.includes("Valor ofertado")) {
+      const lines = text.split("\n").filter(l => l.trim().length > 3);
+      lines.forEach(line => {
+        const l = line.trim();
+        if (l.length < 5 || l.length > 500) return;
+        // Detecta remetente
+        let remetente = "sistema";
+        if (/pregoeiro|autoridade/i.test(l)) remetente = "pregoeiro";
+        else if (/fornecedor|empresa/i.test(l)) remetente = "fornecedor";
+        // Extrai horário
+        const hora = l.match(/(\d{2}\/\d{2}\/\d{4}\s+\d{2}:\d{2}|\d{2}:\d{2}:\d{2}|\d{2}:\d{2})/);
+        dados.mensagens.push({ remetente, mensagem: l.substring(0, 300), horario: hora ? hora[1] : "" });
+      });
+    }
+  });
+
+  // CAPTURA LANCES: busca tabelas/listas de lances dentro de accordions expandidos
+  document.querySelectorAll('[class*="lance"], [class*="rodada"], [class*="negociacao"]').forEach(el => {
+    const rows = el.querySelectorAll("tr, [class*='row']");
+    rows.forEach(row => {
+      const text = row.innerText;
+      const valorMatch = text.match(/R\$\s*([\d.,]+)/);
+      const cnpjMatch = text.match(/(\d{2}\.\d{3}\.\d{3}\/\d{4}-\d{2})/);
+      const horaMatch = text.match(/(\d{2}:\d{2}(:\d{2})?)/);
+      if (valorMatch) {
+        dados.lances.push({
+          empresa: cnpjMatch ? cnpjMatch[1] : "",
+          valor: parseValor(valorMatch[1]),
+          horario: horaMatch ? horaMatch[1] : "",
+          nosso: /MANUTEC|MIAMI/i.test(text),
+        });
+      }
+    });
+  });
+
+  // CAPTURA RECURSOS: aba "Histórico de recursos"
+  document.querySelectorAll('[class*="recurso"], [class*="resource"]').forEach(el => {
+    const text = el.innerText.trim();
+    if (text.length > 10) {
+      dados.eventos.push({ tipo: "recurso", descricao: text.substring(0, 500) });
+    }
+  });
+
+  // STATUS da contratação
+  const statusMatch = bodyText.match(/(?:Contratação na etapa de|Julgado e habilitado|Em fase de|Encerrada|Aberta para|Suspensa)[^.)\n]*/i);
+  if (statusMatch) dados.status_pregao = statusMatch[0].trim();
+
+  console.log(`[LicitacoesAI] ComprasGov: ${dados.classificacao.length} empresas, ${dados.mensagens.length} msgs, ${dados.lances.length} lances. Nossa posição: ${nossaPosicao || "—"}`);
   return dados;
 }
 
@@ -284,93 +334,219 @@ function extrairComprasGov() {
 // ══════════════════════════════════════════════
 
 function extrairSIGA() {
-  const dados = extrairDadosGenericos();
-  dados.portal = "siga";
-
-  // SIGA usa tabelas HTML padrão para lances e classificação
-  // Tenta extrair número do pregão da URL ou título
+  const dados = extrairPortalGenerico("siga");
+  // SIGA RJ: tabelas HTML com fornecedores, lances e mensagens
+  // URL: https://www.compras.rj.gov.br ou siga.fazenda.rj.gov.br
   const titulo = document.title || "";
   const pregaoMatch = titulo.match(/(\d+\/\d{4})/);
-  if (pregaoMatch) dados.compra_id = pregaoMatch[1];
-
+  if (pregaoMatch) dados.numero_pregao = pregaoMatch[1];
   return dados;
 }
-
-// ══════════════════════════════════════════════
-// EXTRATOR COMPRASRJ (Estado RJ)
-// ══════════════════════════════════════════════
 
 function extrairComprasRJ() {
-  const dados = extrairDadosGenericos();
-  dados.portal = "comprasrj";
-
-  // ComprasRJ usa .action pages com tabelas padrão
+  const dados = extrairPortalGenerico("comprasrj");
+  // ComprasRJ: /EditaisLicitacoes/*, tabelas HTML
   const urlMatch = window.location.href.match(/id=(\d+)/);
   if (urlMatch) dados.compra_id = urlMatch[1];
-
   return dados;
 }
-
-// ══════════════════════════════════════════════
-// EXTRATOR LICITAÇÕES-E (Banco do Brasil)
-// ══════════════════════════════════════════════
 
 function extrairLicitacoesE() {
-  const dados = extrairDadosGenericos();
-  dados.portal = "licitacoes-e";
-
-  // Licitações-e usa iframes e Java applets
-  const urlMatch = window.location.href.match(/idLicitacao=(\d+)/);
+  const dados = extrairPortalGenerico("licitacoes-e");
+  // Licitações-e (BB): /aop/*, tabelas HTML + iframes
+  const urlMatch = window.location.href.match(/(?:idLicitacao|licitacao)=(\d+)/i);
   if (urlMatch) dados.compra_id = urlMatch[1];
-
-  // Tenta extrair de dentro de iframes
+  // Tenta iframes
   document.querySelectorAll("iframe").forEach(iframe => {
     try {
-      const iframeDoc = iframe.contentDocument || iframe.contentWindow.document;
-      if (iframeDoc) {
-        iframeDoc.querySelectorAll("table tr").forEach((row, idx) => {
-          const cells = Array.from(row.querySelectorAll("td")).map(td => td.textContent.trim());
-          if (cells.length >= 3) {
-            const cnpj = extrairCNPJ(cells.join(" "));
-            const valor = parseValor(cells.find(c => c.match(/[\d.,]+/)) || "");
-            if (cnpj && valor) {
-              dados.classificacao.push({ posicao: idx + 1, cnpj, empresa: cells[0] || cells[1], valor_lance_final: valor, habilitado: true });
-            }
-          }
-        });
-      }
-    } catch (e) { /* cross-origin blocked */ }
+      const doc = iframe.contentDocument;
+      if (doc) extrairTabelasFornecedores(doc, dados);
+    } catch (e) { /* cross-origin */ }
   });
-
   return dados;
 }
-
-// ══════════════════════════════════════════════
-// EXTRATOR BLL/ComprasBR
-// ══════════════════════════════════════════════
 
 function extrairBLL() {
-  const dados = extrairDadosGenericos();
-  dados.portal = "bll";
-
+  const dados = extrairPortalGenerico("bll");
+  // BLL: /Process/*, React/Angular app
   const urlMatch = window.location.href.match(/Process\/(\d+)/i);
   if (urlMatch) dados.compra_id = urlMatch[1];
+  return dados;
+}
 
+function extrairPortalCompras() {
+  const dados = extrairPortalGenerico("portalcompras");
+  // Portal Compras Públicas: tabelas HTML
+  const urlMatch = window.location.href.match(/\/(\d+)(?:\?|$)/);
+  if (urlMatch) dados.compra_id = urlMatch[1];
   return dados;
 }
 
 // ══════════════════════════════════════════════
-// EXTRATOR PORTAL COMPRAS PÚBLICAS
+// EXTRATOR GENÉRICO INTELIGENTE (funciona em qualquer portal)
 // ══════════════════════════════════════════════
 
-function extrairPortalCompras() {
-  const dados = extrairDadosGenericos();
-  dados.portal = "portalcompras";
+function extrairPortalGenerico(portalName) {
+  const dados = {
+    portal: portalName,
+    tipo: detectarPagina(),
+    url: window.location.href,
+    timestamp: new Date().toISOString(),
+    compra_id: null,
+    title: document.title,
+    titulo: document.body.innerText.substring(0, 1000),
+    classificacao: [],
+    lances: [],
+    mensagens: [],
+    propostas: [],
+    eventos: [],
+    nossa_empresa: "MANUTEC",
+  };
 
-  const urlMatch = window.location.href.match(/\/(\d+)(?:\?|$)/);
-  if (urlMatch) dados.compra_id = urlMatch[1];
+  const bodyText = document.body.innerText;
 
+  // Extrai UASG/órgão
+  const uasgMatch = bodyText.match(/UASG\s*(\d+)/);
+  if (uasgMatch) dados.uasg = uasgMatch[1];
+  const orgaoMatch = bodyText.match(/(?:Órgão|Orgao|Entidade|Unidade)[:\s]+([^\n]{5,60})/i);
+  if (orgaoMatch) dados.orgao_nome = orgaoMatch[1].trim();
+  const pregaoMatch = bodyText.match(/(?:Pregão|Concorrência|Dispensa|Licitação)\s*(?:Eletrônic[oa])?\s*N[°º]?\s*(\d+[\/\-]\d{4})/i);
+  if (pregaoMatch) dados.numero_pregao = pregaoMatch[1];
+  const tetoMatch = bodyText.match(/Valor\s*(?:estimado|referência|total)[^R]*R\$\s*([\d.,]+)/i);
+  if (tetoMatch) dados.valor_teto = parseValor(tetoMatch[1]);
+  const objetoMatch = bodyText.match(/(?:Objeto|Descrição)[:\s]+([^\n]{10,200})/i);
+  if (objetoMatch) dados.objeto = objetoMatch[1].trim();
+
+  // 1. Tenta DOM: cards de fornecedores
+  const cards = document.querySelectorAll('.cp-itens-card, .cp-item-expansivel, [class*="fornecedor"], [class*="proposta-item"], [class*="bidder"], [class*="participante"]');
+  if (cards.length > 0) {
+    extrairCardsDOM(cards, dados);
+  }
+
+  // 2. Tenta tabelas HTML
+  if (dados.classificacao.length === 0) {
+    extrairTabelasFornecedores(document, dados);
+  }
+
+  // 3. Fallback: parse por CNPJ no texto
+  if (dados.classificacao.length === 0) {
+    extrairPorCNPJTexto(bodyText, dados);
+  }
+
+  // Chat/mensagens genérico
+  document.querySelectorAll('[class*="chat"], [class*="mensagem"], [class*="msg"], [class*="aviso"], [class*="comunicado"]').forEach(el => {
+    const text = el.innerText.trim();
+    if (text.length > 5 && text.length < 2000) {
+      dados.mensagens.push({ remetente: "sistema", mensagem: text.substring(0, 300), horario: extrairHorario(text) || "" });
+    }
+  });
+
+  // Detecta nossa posição
+  let nossaPosicao = null, nossoLance = null;
+  dados.classificacao.forEach(c => {
+    if (c.nosso) { nossaPosicao = c.posicao; nossoLance = c.valor_lance_final; }
+  });
+  if (nossaPosicao) { dados.nossa_posicao = nossaPosicao; dados.nosso_lance = nossoLance; }
+
+  console.log(`[LicitacoesAI] ${portalName}: ${dados.classificacao.length} empresas, ${dados.mensagens.length} msgs, ${dados.lances.length} lances`);
   return dados;
+}
+
+// Extrai dados de cards DOM (ComprasGov e similares)
+function extrairCardsDOM(cards, dados) {
+  let pos = 1;
+  cards.forEach(card => {
+    const text = card.innerText;
+    const cnpjMatch = text.match(/(\d{2}\.\d{3}\.\d{3}\/\d{4}-\d{2})/);
+    if (!cnpjMatch) return;
+    const valorMatch = text.match(/R\$\s*([\d.,]+)/);
+    if (!valorMatch) return;
+    const valor = parseValor(valorMatch[1]);
+    if (!valor || valor < 100) return;
+
+    const habilitado = !text.includes("Inabilitada") && !text.includes("Desclassificada");
+    const statusText = text.includes("Inabilitada") ? "Inabilitada" : text.includes("Desclassificada") ? "Desclassificada" : text.includes("Aceita") ? "Aceita e habilitada" : "";
+
+    const lines = text.split("\n").map(l => l.trim()).filter(l => l.length > 3);
+    let empresa = "";
+    for (const line of lines) {
+      if (line.match(/^\d{2}\.\d{3}/) || line.includes("R$") || line.includes("Valor") || line.includes("ME/EPP") || line.includes("Programa") || line.includes("Equidade") || line.includes("Inabilitada") || line.includes("Desclassificada") || line.includes("Aceita") || line.length <= 3) continue;
+      if (line.match(/^[A-ZÀ-Ú0-9]/) && !line.match(/^[A-Z]{2}$/)) { empresa = line; break; }
+    }
+    if (!empresa) return;
+
+    const isNosso = /MANUTEC|MIAMI/i.test(empresa);
+    dados.classificacao.push({ posicao: pos++, cnpj: cnpjMatch[1], empresa: empresa.substring(0, 100), valor_lance_final: valor, habilitado, status: statusText, nosso: isNosso });
+  });
+}
+
+// Extrai dados de tabelas HTML (funciona em qualquer portal com tabelas)
+function extrairTabelasFornecedores(doc, dados) {
+  let pos = dados.classificacao.length + 1;
+  doc.querySelectorAll("table").forEach(table => {
+    const headers = Array.from(table.querySelectorAll("th")).map(th => th.textContent.trim().toLowerCase());
+    const hasEmpresa = headers.some(h => h.includes("fornecedor") || h.includes("empresa") || h.includes("razão") || h.includes("licitante") || h.includes("participante"));
+    const hasValor = headers.some(h => h.includes("valor") || h.includes("preço") || h.includes("lance") || h.includes("proposta"));
+
+    if (hasEmpresa || hasValor) {
+      const rows = Array.from(table.querySelectorAll("tbody tr, tr")).slice(1);
+      rows.forEach(row => {
+        const cells = Array.from(row.querySelectorAll("td")).map(td => td.textContent.trim());
+        if (cells.length < 2) return;
+        const text = cells.join(" ");
+        const cnpj = extrairCNPJ(text);
+        const valorMatch = text.match(/R?\$?\s*([\d.,]{5,})/);
+        const valor = valorMatch ? parseValor(valorMatch[1]) : null;
+        if (!valor || valor < 100) return;
+
+        let empresa = "";
+        for (const cell of cells) {
+          if (cell.length > 5 && cell.match(/^[A-ZÀ-Ú]/) && !cell.match(/^\d/) && !cell.includes("R$")) {
+            empresa = cell; break;
+          }
+        }
+        if (!empresa) return;
+
+        const hab = !text.toLowerCase().includes("inabil") && !text.toLowerCase().includes("desclass");
+        const isNosso = /MANUTEC|MIAMI/i.test(empresa);
+        dados.classificacao.push({ posicao: pos++, cnpj, empresa: empresa.substring(0, 100), valor_lance_final: valor, habilitado: hab, nosso: isNosso });
+      });
+    }
+  });
+}
+
+// Fallback: parse CNPJ no texto livre
+function extrairPorCNPJTexto(bodyText, dados) {
+  const cnpjPattern = /\d{2}\.\d{3}\.\d{3}\/\d{4}-\d{2}/g;
+  const cnpjs = [];
+  let m;
+  while ((m = cnpjPattern.exec(bodyText)) !== null) cnpjs.push({ cnpj: m[0], index: m.index });
+
+  let pos = dados.classificacao.length + 1;
+  for (let i = 0; i < cnpjs.length; i++) {
+    const { cnpj, index: startIdx } = cnpjs[i];
+    const endIdx = i + 1 < cnpjs.length ? cnpjs[i + 1].index : startIdx + 600;
+    const bloco = bodyText.substring(startIdx, endIdx);
+
+    const valorIdx = bloco.indexOf("R$ ");
+    if (valorIdx === -1) continue;
+    const valorStr = bloco.substring(valorIdx + 3, valorIdx + 25).match(/^[\d.,]+/);
+    if (!valorStr) continue;
+    const valor = parseValor(valorStr[0]);
+    if (!valor || valor < 100) continue;
+
+    const hab = !bloco.includes("Inabilitada") && !bloco.includes("Desclassificada");
+    const lines = bloco.split("\n").map(l => l.trim()).filter(l => l.length > 5);
+    let empresa = "";
+    for (const line of lines) {
+      if (line.match(/^\d{2}\.\d{3}/) || line.includes("R$") || line.includes("Valor") || line.includes("ME/EPP") || line.includes("Programa")) continue;
+      if (line.match(/^[A-ZÀ-Ú0-9]/) && !line.match(/^[A-Z]{2}$/)) { empresa = line; break; }
+    }
+    if (!empresa) continue;
+
+    const isNosso = /MANUTEC|MIAMI/i.test(empresa);
+    dados.classificacao.push({ posicao: pos++, cnpj, empresa: empresa.substring(0, 100), valor_lance_final: valor, habilitado: hab, nosso: isNosso });
+  }
 }
 
 // ══════════════════════════════════════════════
@@ -407,7 +583,7 @@ function extrairDados() {
     case "licitacoes-e": return extrairLicitacoesE();
     case "bll": return extrairBLL();
     case "portalcompras": return extrairPortalCompras();
-    default: return extrairDadosGenericos();
+    default: return extrairPortalGenerico("desconhecido");
   }
 }
 
