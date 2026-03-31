@@ -425,9 +425,25 @@ async def extension_sync(request: Request):
                 vals = [c.get("valor_lance_final", 0) or 0 for c in classificacao]
                 valor_teto = max(vals) if vals else 0
 
+            # Extrai objeto do título da página
+            titulo_raw = body.get("titulo", "") or body.get("title", "")
+            objeto = ""
+            # Tenta pegar texto após o número do pregão (ex: "Obras Civis Públicas")
+            import re as _re
+            obj_match = _re.search(r'(?:Pregão|Concorrência|Dispensa)[^0-9]*\d+/\d{4}[^)]*\)\s*(.*?)(?:Critério|Modo|$)', titulo_raw, _re.DOTALL)
+            if obj_match:
+                objeto = obj_match.group(1).strip()[:200]
+            # Fallback: pega o texto principal entre UASG e Critério
+            if not objeto:
+                obj_match2 = _re.search(r'UASG\s*\d+\s*-\s*[^\n]+\n+(.*?)(?:Critério|Modo|\d+\s+Contratação)', titulo_raw, _re.DOTALL)
+                if obj_match2:
+                    objeto = obj_match2.group(1).strip()[:200]
+            if not objeto:
+                objeto = f"{numero_pregao or 'Pregão'} - {orgao_nome or 'UASG ' + uasg}"
+
             conn.execute("""INSERT INTO editais (pncp_id, orgao_nome, objeto, valor_estimado, uf, status, score_relevancia, uasg, portal, fonte)
                 VALUES (?, ?, ?, ?, 'RJ', 'novo', 80, ?, ?, 'extension')""",
-                (fake_pncp_id, orgao_nome or f"UASG {uasg}", f"Capturado via extensão - {numero_pregao}", valor_teto, uasg, portal))
+                (fake_pncp_id, orgao_nome or f"UASG {uasg}", objeto, valor_teto, uasg, portal))
 
         # Cria pregão
         existing_pg = conn.execute("SELECT id FROM pregoes WHERE pncp_id = ?", (fake_pncp_id,)).fetchone()

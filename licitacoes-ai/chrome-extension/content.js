@@ -160,16 +160,26 @@ function extrairComprasGov() {
   };
 
   const bodyText = document.body.innerText;
-  dados.titulo = bodyText.substring(0, 500);
+  dados.titulo = bodyText.substring(0, 1000);
 
-  // Extrai UASG e número do pregão do texto
+  // Extrai UASG e órgão
   const uasgMatch = bodyText.match(/UASG\s*(\d+)\s*-\s*([^\n]+)/);
   if (uasgMatch) {
     dados.uasg = uasgMatch[1];
-    dados.orgao_nome = uasgMatch[2].trim().split(/\s+Crit/)[0];
+    dados.orgao_nome = uasgMatch[2].trim().split(/\s+Crit/)[0].trim();
   }
+
+  // Número do pregão
   const pregaoMatch = bodyText.match(/N[°º]?\s*(\d+\/\d{4})/);
   if (pregaoMatch) dados.numero_pregao = pregaoMatch[1];
+
+  // Tipo de modalidade
+  const modalMatch = bodyText.match(/(Pregão Eletrônico|Concorrência Eletrônica|Dispensa|Pregão)/i);
+  if (modalMatch) dados.modalidade = modalMatch[1];
+
+  // Objeto: texto após número de itens (ex: "1 Obras Civis Públicas")
+  const objetoMatch = bodyText.match(/\d+\s+([A-ZÀ-Ú][a-záàâãéèêíïóôõúç\s]+(?:\([^)]+\))?)/);
+  if (objetoMatch) dados.objeto = objetoMatch[1].trim();
 
   // PARSER: encontra todos os CNPJs e extrai dados do bloco após cada um
   const cnpjPattern = /\d{2}\.\d{3}\.\d{3}\/\d{4}-\d{2}/g;
