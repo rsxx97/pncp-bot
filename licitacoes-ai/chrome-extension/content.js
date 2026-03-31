@@ -153,16 +153,37 @@ function extrairComprasGov() {
   if (dados.classificacao.length === 0) {
     const bodyText = document.body.innerText;
 
-    // Padrão ComprasGov: "CNPJ EMPRESA UF Valor ofertado (total) Valor negociado (total) R$ X.XXX,XX"
-    const pattern = /(\d{2}\.\d{3}\.\d{3}\/\d{4}-\d{2})\s+(?:ME\/EPP\s+)?(?:Equidade[^\n]*\s+)?(?:Programa[^\n]*\s+)?([A-ZÀ-Ú][A-ZÀ-Ú\s\.\-\/&,]+?)(?:\s+[A-Z]{2}\s+)Valor\s+ofertado[^R]*R\$\s*([\d.,]+)/g;
-    let match;
+    // Encontra todos os blocos CNPJ...R$ no texto
+    // Formato: "CNPJ [badges] [status] EMPRESA UF Valor ofertado ... R$ X.XXX,XX"
+    const blocos = bodyText.split(/(?=\d{2}\.\d{3}\.\d{3}\/\d{4}-\d{2})/);
     let pos = 1;
-    while ((match = pattern.exec(bodyText)) !== null) {
-      const cnpj = match[1];
-      const empresa = match[2].trim().substring(0, 80);
-      const valor = parseValor(match[3]);
-      if (valor && valor > 100) {
-        dados.classificacao.push({ posicao: pos++, cnpj, empresa, valor_lance_final: valor, habilitado: true });
+    for (const bloco of blocos) {
+      const cnpjMatch = bloco.match(/^(\d{2}\.\d{3}\.\d{3}\/\d{4}-\d{2})/);
+      if (!cnpjMatch) continue;
+      const cnpj = cnpjMatch[1];
+
+      // Extrai valor (primeiro R$ no bloco)
+      const valorMatch = bloco.match(/R\$\s*([\d.,]+)/);
+      if (!valorMatch) continue;
+      const valor = parseValor(valorMatch[1]);
+      if (!valor || valor < 100) continue;
+
+      // Extrai status (Inabilitada, Desclassificada, Aceita e habilitada, etc.)
+      const habMatch = bloco.match(/(Inabilitada|Desclassificada|Aceita e habilitada|Aceita)/i);
+      const habilitado = !habMatch || habMatch[1].toLowerCase().includes("aceita");
+
+      // Extrai nome da empresa (texto em maiúsculas entre status/badges e UF)
+      const nomeMatch = bloco.match(/(?:Inabilitada|Desclassificada|Aceita e habilitada|Aceita|integridade)\s+([A-ZÀ-Ú0-9][A-ZÀ-Ú0-9\s\.\-\/&,]+?)\s+[A-Z]{2}\s+Valor/);
+      let empresa = nomeMatch ? nomeMatch[1].trim() : "";
+
+      // Fallback: pega texto entre CNPJ e "Valor"
+      if (!empresa) {
+        const fallback = bloco.match(/\d{2}\s+(.+?)\s+[A-Z]{2}\s+Valor/);
+        if (fallback) empresa = fallback[1].replace(/ME\/EPP|Programa de integridade|Equidade[^A-Z]*/g, "").trim();
+      }
+
+      if (empresa) {
+        dados.classificacao.push({ posicao: pos++, cnpj, empresa: empresa.substring(0, 80), valor_lance_final: valor, habilitado });
       }
     }
 
