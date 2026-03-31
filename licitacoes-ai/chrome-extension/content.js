@@ -4,7 +4,7 @@
  * e envia para o dashboard Licitações AI via API local.
  */
 
-const DASHBOARD_API = "http://localhost:8001/api";
+const DASHBOARD_API = "https://pncp-bot-production.up.railway.app/api";
 let lastData = null;
 let observerActive = false;
 let pollInterval = null;

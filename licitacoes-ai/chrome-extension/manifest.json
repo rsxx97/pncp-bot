@@ -6,7 +6,7 @@
   "permissions": ["storage", "activeTab"],
   "host_permissions": [
     "https://cnetmobile.estaleiro.serpro.gov.br/*",
-    "http://localhost:8001/*"
+    "https://pncp-bot-production.up.railway.app/*"
   ],
   "content_scripts": [
     {

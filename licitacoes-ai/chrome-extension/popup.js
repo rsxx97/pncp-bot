@@ -1,4 +1,4 @@
-const DASHBOARD_URL = "http://localhost:8001";
+const DASHBOARD_URL = "https://pncp-bot-production.up.railway.app";
 
 // Verifica status do dashboard
 async function checkDashboard() {
