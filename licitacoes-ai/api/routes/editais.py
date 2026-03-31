@@ -536,6 +536,25 @@ def resetar_edital(pncp_id: str):
     return {"ok": True, "status": "novo"}
 
 
+@router.put("/{pncp_id:path}/atualizar")
+def atualizar_edital(pncp_id: str, body: dict):
+    """Atualiza campos do edital."""
+    conn = get_connection()
+    allowed = ["orgao_nome", "objeto", "valor_estimado", "uf", "municipio", "uasg", "portal", "data_abertura", "data_encerramento"]
+    updates = []
+    values = []
+    for k, v in body.items():
+        if k in allowed:
+            updates.append(f"{k} = ?")
+            values.append(v)
+    if not updates:
+        return {"ok": False, "error": "Nenhum campo válido"}
+    values.append(pncp_id)
+    conn.execute(f"UPDATE editais SET {', '.join(updates)}, updated_at = datetime('now') WHERE pncp_id = ?", values)
+    conn.commit()
+    return {"ok": True}
+
+
 @router.post("/{pncp_id:path}/analisar")
 def analisar_edital(pncp_id: str):
     import threading
