@@ -183,28 +183,5 @@ function Dashboard({ onLogout }) {
 }
 
 export default function App() {
-  const [token, setToken] = useState(() => localStorage.getItem("token"));
-  const [tenant, setTenant] = useState(() => {
-    try { return JSON.parse(localStorage.getItem("tenant")); } catch { return null; }
-  });
-
-  const handleLogin = (data) => {
-    localStorage.setItem("token", data.token);
-    localStorage.setItem("tenant", JSON.stringify(data.tenant));
-    setToken(data.token);
-    setTenant(data.tenant);
-  };
-
-  const handleLogout = () => {
-    localStorage.removeItem("token");
-    localStorage.removeItem("tenant");
-    setToken(null);
-    setTenant(null);
-  };
-
-  if (!token) {
-    return <Login onLogin={handleLogin} />;
-  }
-
-  return <Dashboard onLogout={handleLogout} />;
+  return <Dashboard onLogout={() => {}} />;
 }
