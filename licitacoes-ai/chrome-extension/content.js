@@ -143,88 +143,112 @@ function extrairDadosGenericos() {
 // ══════════════════════════════════════════════
 
 function extrairComprasGov() {
-  const dados = extrairDadosGenericos();
-  dados.portal = "comprasgov";
+  const dados = {
+    portal: "comprasgov",
+    tipo: detectarPagina(),
+    url: window.location.href,
+    timestamp: new Date().toISOString(),
+    compra_id: new URLSearchParams(window.location.search).get("compra"),
+    title: document.title,
+    titulo: "",
+    classificacao: [],
+    lances: [],
+    mensagens: [],
+    propostas: [],
+    eventos: [],
+    nossa_empresa: "MANUTEC",
+  };
 
-  const urlParams = new URLSearchParams(window.location.search);
-  dados.compra_id = urlParams.get("compra");
-  dados.title = document.title;
-  dados.titulo = document.body.innerText.substring(0, 500);
+  const bodyText = document.body.innerText;
+  dados.titulo = bodyText.substring(0, 500);
 
-  // Método 1: Busca por blocos CNPJ + Nome + Valor no texto completo
-  if (dados.classificacao.length === 0) {
-    const bodyText = document.body.innerText;
+  // Extrai UASG e número do pregão do texto
+  const uasgMatch = bodyText.match(/UASG\s*(\d+)\s*-\s*([^\n]+)/);
+  if (uasgMatch) {
+    dados.uasg = uasgMatch[1];
+    dados.orgao_nome = uasgMatch[2].trim().split(/\s+Crit/)[0];
+  }
+  const pregaoMatch = bodyText.match(/N[°º]?\s*(\d+\/\d{4})/);
+  if (pregaoMatch) dados.numero_pregao = pregaoMatch[1];
 
-    // Encontra todos os blocos CNPJ...R$ no texto
-    // Formato: "CNPJ [badges] [status] EMPRESA UF Valor ofertado ... R$ X.XXX,XX"
-    const blocos = bodyText.split(/(?=\d{2}\.\d{3}\.\d{3}\/\d{4}-\d{2})/);
-    let pos = 1;
-    for (const bloco of blocos) {
-      const cnpjMatch = bloco.match(/^(\d{2}\.\d{3}\.\d{3}\/\d{4}-\d{2})/);
-      if (!cnpjMatch) continue;
-      const cnpj = cnpjMatch[1];
+  // PARSER PRINCIPAL: split por CNPJ
+  // Cada empresa aparece como bloco: "CNPJ [badges] [status] NOME UF Valor ofertado ... R$ X.XXX,XX"
+  const blocos = bodyText.split(/(?=\d{2}\.\d{3}\.\d{3}\/\d{4}-\d{2})/);
+  let pos = 1;
+  let nossaPosicao = null;
+  let nossoLance = null;
 
-      // Extrai valor (primeiro R$ no bloco)
-      const valorMatch = bloco.match(/R\$\s*([\d.,]+)/);
-      if (!valorMatch) continue;
-      const valor = parseValor(valorMatch[1]);
-      if (!valor || valor < 100) continue;
+  for (const bloco of blocos) {
+    // 1. CNPJ
+    const cnpjMatch = bloco.match(/^(\d{2}\.\d{3}\.\d{3}\/\d{4}-\d{2})/);
+    if (!cnpjMatch) continue;
+    const cnpj = cnpjMatch[1];
 
-      // Extrai status (Inabilitada, Desclassificada, Aceita e habilitada, etc.)
-      const habMatch = bloco.match(/(Inabilitada|Desclassificada|Aceita e habilitada|Aceita)/i);
-      const habilitado = !habMatch || habMatch[1].toLowerCase().includes("aceita");
+    // 2. Valor (R$ X.XXX,XX)
+    const valorMatch = bloco.match(/R\$\s*([\d.,]+)/);
+    if (!valorMatch) continue;
+    const valor = parseValor(valorMatch[1]);
+    if (!valor || valor < 100) continue;
 
-      // Extrai nome da empresa (texto em maiúsculas entre status/badges e UF)
-      const nomeMatch = bloco.match(/(?:Inabilitada|Desclassificada|Aceita e habilitada|Aceita|integridade)\s+([A-ZÀ-Ú0-9][A-ZÀ-Ú0-9\s\.\-\/&,]+?)\s+[A-Z]{2}\s+Valor/);
-      let empresa = nomeMatch ? nomeMatch[1].trim() : "";
+    // 3. Status habilitação
+    const isInabilitada = /Inabilitada/i.test(bloco);
+    const isDesclassificada = /Desclassificada/i.test(bloco);
+    const isAceita = /Aceita/i.test(bloco);
+    const habilitado = !isInabilitada && !isDesclassificada;
+    let statusText = isInabilitada ? "Inabilitada" : isDesclassificada ? "Desclassificada" : isAceita ? "Aceita e habilitada" : "";
 
-      // Fallback: pega texto entre CNPJ e "Valor"
-      if (!empresa) {
-        const fallback = bloco.match(/\d{2}\s+(.+?)\s+[A-Z]{2}\s+Valor/);
-        if (fallback) empresa = fallback[1].replace(/ME\/EPP|Programa de integridade|Equidade[^A-Z]*/g, "").trim();
-      }
-
-      if (empresa) {
-        dados.classificacao.push({ posicao: pos++, cnpj, empresa: empresa.substring(0, 80), valor_lance_final: valor, habilitado });
+    // 4. Nome da empresa — texto entre badges/status e UF (2 letras antes de "Valor")
+    let empresa = "";
+    // Remove CNPJ do início
+    let rest = bloco.substring(cnpj.length).trim();
+    // Remove badges
+    rest = rest.replace(/ME\/EPP/g, "").replace(/Programa de integridade/g, "").replace(/Equidade de g[êe]nero \([^)]+\)/g, "");
+    // Remove status
+    rest = rest.replace(/Inabilitada|Desclassificada|Aceita e habilitada|Aceita/gi, "");
+    // Pega texto até "UF Valor"
+    const nomeMatch = rest.match(/^\s*([A-ZÀ-Ú0-9][A-ZÀ-Ú0-9\s\.\-\/&,()]+?)\s+[A-Z]{2}\s+Valor/);
+    if (nomeMatch) {
+      empresa = nomeMatch[1].trim();
+    }
+    // Fallback: pega tudo antes de "Valor"
+    if (!empresa) {
+      const fb = rest.match(/^\s*(.+?)\s+Valor/);
+      if (fb) {
+        empresa = fb[1].replace(/\s+[A-Z]{2}\s*$/, "").trim();
       }
     }
 
-    // Método 2: Se não achou com padrão complexo, tenta simples
-    if (dados.classificacao.length === 0) {
-      const cnpjRegex = /(\d{2}\.\d{3}\.\d{3}\/\d{4}-\d{2})/g;
-      const valorRegex = /R\$\s*([\d.,]+)/g;
-      const cnpjs = [...bodyText.matchAll(cnpjRegex)];
-      const valores = [...bodyText.matchAll(valorRegex)];
+    if (!empresa || empresa.length < 3) continue;
 
-      if (cnpjs.length > 0 && cnpjs.length <= valores.length) {
-        const lines = bodyText.split("\n");
-        let pos = 1;
-
-        for (const cnpjMatch of cnpjs) {
-          const cnpj = cnpjMatch[1];
-          const idx = cnpjMatch.index;
-          // Pega texto depois do CNPJ até o próximo CNPJ ou 500 chars
-          const afterCnpj = bodyText.substring(idx + cnpj.length, idx + 500);
-
-          // Nome: primeira sequência de palavras maiúsculas após CNPJ
-          const nomeMatch = afterCnpj.match(/\s*([A-ZÀ-Ú][A-ZÀ-Ú\s\.\-\/&,]{5,80})/);
-          const empresa = nomeMatch ? nomeMatch[1].trim() : "";
-
-          // Valor: primeiro R$ após o nome
-          const valorMatch = afterCnpj.match(/R\$\s*([\d.,]+)/);
-          const valor = valorMatch ? parseValor(valorMatch[1]) : null;
-
-          if (empresa && valor && valor > 100) {
-            // Evita duplicatas
-            if (!dados.classificacao.find(c => c.cnpj === cnpj)) {
-              dados.classificacao.push({ posicao: pos++, cnpj, empresa, valor_lance_final: valor, habilitado: true });
-            }
-          }
-        }
-      }
+    // 5. Detecta se é nossa empresa
+    const isNosso = /MANUTEC|MIAMI/i.test(empresa);
+    if (isNosso) {
+      nossaPosicao = pos;
+      nossoLance = valor;
     }
+
+    dados.classificacao.push({
+      posicao: pos++,
+      cnpj,
+      empresa: empresa.substring(0, 100),
+      valor_lance_final: valor,
+      habilitado,
+      status: statusText,
+      nosso: isNosso,
+    });
   }
 
+  // Define nossa posição e lance
+  if (nossaPosicao) {
+    dados.nossa_posicao = nossaPosicao;
+    dados.nosso_lance = nossoLance;
+  }
+
+  // Extrai valor estimado/teto
+  const tetoMatch = bodyText.match(/Valor estimado[^R]*R\$\s*([\d.,]+)/);
+  if (tetoMatch) dados.valor_teto = parseValor(tetoMatch[1]);
+
+  console.log(`[LicitacoesAI] ComprasGov: ${dados.classificacao.length} empresas capturadas. Nossa posição: ${nossaPosicao || "não encontrada"}`);
   return dados;
 }
 

@@ -469,20 +469,30 @@ async def extension_sync(request: Request):
 
     # Atualiza vencedor = primeira empresa HABILITADA
     if classificacao and len(classificacao) > 0:
-        # Ordena por posição e pega a primeira habilitada
         sorted_class = sorted(classificacao, key=lambda x: x.get("posicao", 999))
         vencedor = None
         for emp in sorted_class:
             if emp.get("habilitado", True):
                 vencedor = emp
                 break
-        # Se nenhuma habilitada, pega a primeira
         if not vencedor:
             vencedor = sorted_class[0]
 
+        # Atualiza pregão com vencedor e nossa posição
+        nossa_posicao = body.get("nossa_posicao")
+        nosso_lance = body.get("nosso_lance")
+        orgao_nome = body.get("orgao_nome", "")
+
         conn.execute("""UPDATE pregoes SET vencedor_nome = ?, vencedor_valor = ?, total_participantes = ?,
+            posicao_final = ?, lance_final = ?, nossa_empresa = ?,
             status = 'resultado', updated_at = datetime('now') WHERE id = ?""",
-            (vencedor.get("empresa"), vencedor.get("valor_lance_final"), len(classificacao), pregao_id))
+            (vencedor.get("empresa"), vencedor.get("valor_lance_final"), len(classificacao),
+             nossa_posicao, nosso_lance, body.get("nossa_empresa", "MANUTEC"), pregao_id))
+
+        # Atualiza edital com orgão se veio
+        if orgao_nome:
+            conn.execute("UPDATE editais SET orgao_nome = ? WHERE pncp_id = (SELECT pncp_id FROM pregoes WHERE id = ?)",
+                         (orgao_nome, pregao_id))
 
     conn.commit()
 
