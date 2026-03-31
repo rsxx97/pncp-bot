@@ -376,27 +376,68 @@ async def extension_sync(request: Request):
 
     saved = {"classificacao": 0, "lances": 0, "mensagens": 0}
 
-    # Tenta achar pregão pelo compra_id ou URL
+    # Extrai info da URL/página
+    page_url = body.get("url", "")
+    page_title = body.get("title", "")
+    uasg = ""
+    numero_pregao = ""
+    orgao_nome = ""
+    objeto = ""
+
+    # Extrai UASG e número do compra_id (formato: UASG+MODALIDADE+NUMERO)
+    if compra_id and len(compra_id) > 10:
+        uasg = compra_id[:6]
+
+    # Extrai do título/texto da página
+    titulo_texto = body.get("titulo", "") or page_title
+    import re
+    uasg_match = re.search(r'UASG\s*(\d{5,6})', titulo_texto)
+    if uasg_match:
+        uasg = uasg_match.group(1)
+    pregao_match = re.search(r'N[°º]?\s*(\d+/\d{4})', titulo_texto)
+    if pregao_match:
+        numero_pregao = pregao_match.group(1)
+    orgao_match = re.search(r'UASG\s*\d+\s*-\s*(.+?)(?:\s*Critério|$)', titulo_texto)
+    if orgao_match:
+        orgao_nome = orgao_match.group(1).strip()
+
+    # Tenta achar pregão existente
     pregao = None
     if compra_id:
-        # Busca por compra_id no campo link_portal ou observacoes
         pregao = conn.execute("SELECT id FROM pregoes WHERE link_portal LIKE ? OR observacoes LIKE ? LIMIT 1",
                               (f"%{compra_id}%", f"%{compra_id}%")).fetchone()
 
-    # Se não achou, pega o último pregão ativo
-    if not pregao:
-        pregao = conn.execute("SELECT id FROM pregoes WHERE status NOT IN ('homologado','contrato','fracassado') ORDER BY updated_at DESC LIMIT 1").fetchone()
+    if not pregao and uasg:
+        # Busca por UASG no edital
+        edital = conn.execute("SELECT pncp_id FROM editais WHERE uasg = ? LIMIT 1", (uasg,)).fetchone()
+        if edital:
+            pregao = conn.execute("SELECT id FROM pregoes WHERE pncp_id = ?", (edital["pncp_id"],)).fetchone()
 
-    # Se ainda não tem pregão, salva os dados no storage temporário
+    # Se não existe edital nem pregão, cria ambos automaticamente
     if not pregao:
-        # Salva como evento no banco para não perder
-        from datetime import datetime
-        conn.execute("""INSERT INTO pregao_eventos (pregao_id, tipo, descricao, data_hora)
-            VALUES (0, 'extension_sync', ?, ?)""",
-            (json.dumps({"portal": portal, "compra_id": compra_id, "classificacao": len(classificacao), "lances": len(lances), "mensagens": len(mensagens)}, ensure_ascii=False),
-             datetime.now().isoformat()))
-        conn.commit()
-        return {"ok": True, "pregao_id": None, "saved": saved, "message": f"Dados recebidos de {portal} mas nenhum pregão ativo encontrado. {len(classificacao)} empresas, {len(lances)} lances, {len(mensagens)} mensagens."}
+        # Cria edital fake com dados da extensão
+        fake_pncp_id = f"EXT-{compra_id or uasg or 'unknown'}"
+        existing_ed = conn.execute("SELECT pncp_id FROM editais WHERE pncp_id = ?", (fake_pncp_id,)).fetchone()
+        if not existing_ed:
+            valor_teto = 0
+            if classificacao:
+                # Estima valor pelo maior lance
+                vals = [c.get("valor_lance_final", 0) or 0 for c in classificacao]
+                valor_teto = max(vals) if vals else 0
+
+            conn.execute("""INSERT INTO editais (pncp_id, orgao_nome, objeto, valor_estimado, uf, status, score_relevancia, uasg, portal, fonte)
+                VALUES (?, ?, ?, ?, 'RJ', 'novo', 80, ?, ?, 'extension')""",
+                (fake_pncp_id, orgao_nome or f"UASG {uasg}", f"Capturado via extensão - {numero_pregao}", valor_teto, uasg, portal))
+
+        # Cria pregão
+        existing_pg = conn.execute("SELECT id FROM pregoes WHERE pncp_id = ?", (fake_pncp_id,)).fetchone()
+        if not existing_pg:
+            conn.execute("""INSERT INTO pregoes (pncp_id, status, portal, link_portal, observacoes)
+                VALUES (?, 'em_disputa', ?, ?, ?)""",
+                (fake_pncp_id, portal, page_url, f"compra_id={compra_id} UASG={uasg} {numero_pregao}"))
+            conn.commit()
+
+        pregao = conn.execute("SELECT id FROM pregoes WHERE pncp_id = ?", (fake_pncp_id,)).fetchone()
 
     pregao_id = pregao["id"]
 

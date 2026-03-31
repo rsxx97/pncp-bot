@@ -148,6 +148,8 @@ function extrairComprasGov() {
 
   const urlParams = new URLSearchParams(window.location.search);
   dados.compra_id = urlParams.get("compra");
+  dados.title = document.title;
+  dados.titulo = document.body.innerText.substring(0, 500);
 
   // Método 1: Busca por blocos CNPJ + Nome + Valor no texto completo
   if (dados.classificacao.length === 0) {
