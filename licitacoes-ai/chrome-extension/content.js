@@ -149,32 +149,54 @@ function extrairComprasGov() {
   const urlParams = new URLSearchParams(window.location.search);
   dados.compra_id = urlParams.get("compra");
 
-  // Extrai propostas do ComprasGov (formato específico: CNPJ + Nome + UF + Valor)
+  // Método 1: Busca por blocos CNPJ + Nome + Valor no texto completo
   if (dados.classificacao.length === 0) {
     const bodyText = document.body.innerText;
-    const lines = bodyText.split("\n");
-    let pos = 1;
 
-    for (let i = 0; i < lines.length; i++) {
-      const line = lines[i].trim();
-      const cnpjMatch = line.match(/^(\d{2}\.\d{3}\.\d{3}\/\d{4}-\d{2})/);
-      if (cnpjMatch) {
-        const cnpj = cnpjMatch[1];
-        // Próximas linhas contêm nome e valor
-        let empresa = "";
-        let valor = null;
-        for (let j = i; j < Math.min(i + 5, lines.length); j++) {
-          const l = lines[j].trim();
-          if (l.match(/^[A-ZÀ-Ú].{5,}/) && !l.match(/^\d/) && !empresa) {
-            empresa = l.substring(0, 60);
+    // Padrão ComprasGov: "CNPJ EMPRESA UF Valor ofertado (total) Valor negociado (total) R$ X.XXX,XX"
+    const pattern = /(\d{2}\.\d{3}\.\d{3}\/\d{4}-\d{2})\s+(?:ME\/EPP\s+)?(?:Equidade[^\n]*\s+)?(?:Programa[^\n]*\s+)?([A-ZÀ-Ú][A-ZÀ-Ú\s\.\-\/&,]+?)(?:\s+[A-Z]{2}\s+)Valor\s+ofertado[^R]*R\$\s*([\d.,]+)/g;
+    let match;
+    let pos = 1;
+    while ((match = pattern.exec(bodyText)) !== null) {
+      const cnpj = match[1];
+      const empresa = match[2].trim().substring(0, 80);
+      const valor = parseValor(match[3]);
+      if (valor && valor > 100) {
+        dados.classificacao.push({ posicao: pos++, cnpj, empresa, valor_lance_final: valor, habilitado: true });
+      }
+    }
+
+    // Método 2: Se não achou com padrão complexo, tenta simples
+    if (dados.classificacao.length === 0) {
+      const cnpjRegex = /(\d{2}\.\d{3}\.\d{3}\/\d{4}-\d{2})/g;
+      const valorRegex = /R\$\s*([\d.,]+)/g;
+      const cnpjs = [...bodyText.matchAll(cnpjRegex)];
+      const valores = [...bodyText.matchAll(valorRegex)];
+
+      if (cnpjs.length > 0 && cnpjs.length <= valores.length) {
+        const lines = bodyText.split("\n");
+        let pos = 1;
+
+        for (const cnpjMatch of cnpjs) {
+          const cnpj = cnpjMatch[1];
+          const idx = cnpjMatch.index;
+          // Pega texto depois do CNPJ até o próximo CNPJ ou 500 chars
+          const afterCnpj = bodyText.substring(idx + cnpj.length, idx + 500);
+
+          // Nome: primeira sequência de palavras maiúsculas após CNPJ
+          const nomeMatch = afterCnpj.match(/\s*([A-ZÀ-Ú][A-ZÀ-Ú\s\.\-\/&,]{5,80})/);
+          const empresa = nomeMatch ? nomeMatch[1].trim() : "";
+
+          // Valor: primeiro R$ após o nome
+          const valorMatch = afterCnpj.match(/R\$\s*([\d.,]+)/);
+          const valor = valorMatch ? parseValor(valorMatch[1]) : null;
+
+          if (empresa && valor && valor > 100) {
+            // Evita duplicatas
+            if (!dados.classificacao.find(c => c.cnpj === cnpj)) {
+              dados.classificacao.push({ posicao: pos++, cnpj, empresa, valor_lance_final: valor, habilitado: true });
+            }
           }
-          const valorMatch = l.match(/R\$\s*([\d.,]+)/);
-          if (valorMatch && !valor) {
-            valor = parseValor(valorMatch[1]);
-          }
-        }
-        if (empresa && valor && valor > 1000) {
-          dados.classificacao.push({ posicao: pos++, cnpj, empresa, valor_lance_final: valor, habilitado: true });
         }
       }
     }
