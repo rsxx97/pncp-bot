@@ -173,6 +173,7 @@ CREATE TABLE IF NOT EXISTS tenants (
     senha_hash TEXT NOT NULL,
     plano TEXT DEFAULT 'free',
     ativo BOOLEAN DEFAULT 1,
+    aprovado INTEGER DEFAULT 0,
     created_at TEXT DEFAULT (datetime('now')),
     updated_at TEXT DEFAULT (datetime('now'))
 );
@@ -200,6 +201,82 @@ CREATE TABLE IF NOT EXISTS tenant_empresas (
 );
 
 CREATE INDEX IF NOT EXISTS idx_tenant_empresas_tenant ON tenant_empresas(tenant_id);
+
+CREATE TABLE IF NOT EXISTS pregoes (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    pncp_id TEXT NOT NULL,
+    status TEXT DEFAULT 'agendado',
+    data_sessao TEXT,
+    hora_sessao TEXT,
+    portal TEXT DEFAULT 'comprasnet',
+    link_portal TEXT,
+    nossa_empresa TEXT,
+    valor_proposta REAL,
+    lance_final REAL,
+    posicao_final INTEGER,
+    total_participantes INTEGER,
+    vencedor_nome TEXT,
+    vencedor_valor REAL,
+    resultado TEXT,
+    habilitacao_status TEXT,
+    recursos_prazo TEXT,
+    homologacao_data TEXT,
+    contrato_numero TEXT,
+    contrato_vigencia_inicio TEXT,
+    contrato_vigencia_fim TEXT,
+    observacoes TEXT,
+    created_at TEXT DEFAULT (datetime('now')),
+    updated_at TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY (pncp_id) REFERENCES editais(pncp_id)
+);
+
+CREATE TABLE IF NOT EXISTS lances (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    pregao_id INTEGER NOT NULL,
+    rodada INTEGER DEFAULT 1,
+    empresa TEXT,
+    valor REAL,
+    horario TEXT,
+    tipo TEXT DEFAULT 'lance',
+    nosso INTEGER DEFAULT 0,
+    created_at TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY (pregao_id) REFERENCES pregoes(id)
+);
+
+CREATE TABLE IF NOT EXISTS chat_pregao (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    pregao_id INTEGER NOT NULL,
+    remetente TEXT DEFAULT 'pregoeiro',
+    mensagem TEXT,
+    horario TEXT,
+    created_at TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY (pregao_id) REFERENCES pregoes(id)
+);
+
+CREATE TABLE IF NOT EXISTS pregao_eventos (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    pregao_id INTEGER NOT NULL,
+    tipo TEXT,
+    descricao TEXT,
+    data_hora TEXT,
+    created_at TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY (pregao_id) REFERENCES pregoes(id)
+);
+
+CREATE TABLE IF NOT EXISTS pregao_classificacao (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    pregao_id INTEGER NOT NULL,
+    posicao INTEGER NOT NULL,
+    empresa TEXT NOT NULL,
+    cnpj TEXT,
+    valor_proposta REAL,
+    valor_lance_final REAL,
+    desconto_pct REAL,
+    habilitado INTEGER DEFAULT 1,
+    observacao TEXT,
+    created_at TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY (pregao_id) REFERENCES pregoes(id)
+);
 """
 
 
