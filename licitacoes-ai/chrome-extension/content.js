@@ -365,30 +365,18 @@ function extrairDados() {
 // ══════════════════════════════════════════════
 
 async function enviarParaDashboard(dados) {
-  try {
-    const resp = await fetch(`${DASHBOARD_API}/pregoes/extension/sync`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(dados),
+  // Envia via background.js para evitar CORS
+  return new Promise((resolve) => {
+    chrome.runtime.sendMessage({ type: "enviar_dados", data: dados }, (response) => {
+      if (response?.ok) {
+        console.log(`[LicitacoesAI][${dados.portal}] Dados enviados via background:`, response.result);
+        resolve(true);
+      } else {
+        console.warn(`[LicitacoesAI][${dados.portal}] Erro:`, response?.error || "sem resposta");
+        resolve(false);
+      }
     });
-    if (resp.ok) {
-      const result = await resp.json();
-      console.log(`[LicitacoesAI][${dados.portal}] Dados enviados:`, result);
-      notificarExtensao("sync_ok", {
-        portal: dados.portal,
-        classificacao: dados.classificacao?.length || 0,
-        lances: dados.lances?.length || 0,
-        mensagens: dados.mensagens?.length || 0,
-      });
-      return true;
-    } else {
-      console.warn(`[LicitacoesAI][${dados.portal}] Erro:`, resp.status);
-      return false;
-    }
-  } catch (e) {
-    console.warn(`[LicitacoesAI][${dados.portal}] Dashboard offline:`, e.message);
-    return false;
-  }
+  });
 }
 
 function notificarExtensao(tipo, dados) {
