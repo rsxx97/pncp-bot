@@ -3,7 +3,7 @@ import json
 from datetime import datetime
 from pathlib import Path
 from typing import Optional
-from fastapi import APIRouter, Query, HTTPException
+from fastapi import APIRouter, Query, HTTPException, Request
 from pydantic import BaseModel
 from api.deps import get_connection
 
@@ -359,8 +359,12 @@ def listar_portais():
 # ── Sync da extensão Chrome ──
 
 @router.post("/extension/sync")
-def extension_sync(body: dict):
+async def extension_sync(request: Request):
     """Recebe dados capturados pela extensão Chrome de qualquer portal."""
+    try:
+        body = await request.json()
+    except Exception:
+        return {"ok": False, "error": "JSON inválido"}
     conn = get_connection()
 
     portal = body.get("portal", "desconhecido")
