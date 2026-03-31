@@ -181,66 +181,88 @@ function extrairComprasGov() {
   const objetoMatch = bodyText.match(/\d+\s+([A-ZÀ-Ú][a-záàâãéèêíïóôõúç\s]+(?:\([^)]+\))?)/);
   if (objetoMatch) dados.objeto = objetoMatch[1].trim();
 
-  // PARSER: encontra todos os CNPJs e extrai dados do bloco após cada um
-  const cnpjPattern = /\d{2}\.\d{3}\.\d{3}\/\d{4}-\d{2}/g;
-  const cnpjs = [];
-  let m;
-  while ((m = cnpjPattern.exec(bodyText)) !== null) {
-    cnpjs.push({ cnpj: m[0], index: m.index });
-  }
-
+  // PARSER DOM: usa elementos da página diretamente
+  const cards = document.querySelectorAll('.cp-itens-card, .cp-item-expansivel, [class*="fornecedor-card"]');
   let pos = 1;
   let nossaPosicao = null;
   let nossoLance = null;
 
-  for (let i = 0; i < cnpjs.length; i++) {
-    const { cnpj, index: startIdx } = cnpjs[i];
-    const endIdx = i + 1 < cnpjs.length ? cnpjs[i + 1].index : startIdx + 600;
-    const bloco = bodyText.substring(startIdx, endIdx);
+  if (cards.length > 0) {
+    // Método DOM: cada card é um fornecedor
+    cards.forEach(card => {
+      const text = card.innerText;
+      const cnpjMatch = text.match(/(\d{2}\.\d{3}\.\d{3}\/\d{4}-\d{2})/);
+      if (!cnpjMatch) return;
+      const cnpj = cnpjMatch[1];
 
-    // Valor: busca "R$ " seguido de números
-    const valorIdx = bloco.indexOf("R$ ");
-    if (valorIdx === -1) continue;
-    const valorStr = bloco.substring(valorIdx + 3, valorIdx + 25).match(/^[\d.,]+/);
-    if (!valorStr) continue;
-    const valor = parseValor(valorStr[0]);
-    if (!valor || valor < 100) continue;
+      const valorMatch = text.match(/R\$\s*([\d.,]+)/);
+      if (!valorMatch) return;
+      const valor = parseValor(valorMatch[1]);
+      if (!valor || valor < 100) return;
 
-    // Status habilitação
-    const habilitado = !bloco.includes("Inabilitada") && !bloco.includes("Desclassificada");
-    const statusText = bloco.includes("Inabilitada") ? "Inabilitada" : bloco.includes("Desclassificada") ? "Desclassificada" : bloco.includes("Aceita") ? "Aceita" : "";
+      const habilitado = !text.includes("Inabilitada") && !text.includes("Desclassificada");
+      const statusText = text.includes("Inabilitada") ? "Inabilitada" : text.includes("Desclassificada") ? "Desclassificada" : text.includes("Aceita") ? "Aceita e habilitada" : "";
 
-    // Nome: texto entre CNPJ e "UF Valor"
-    let empresa = "";
-    const afterCnpj = bloco.substring(cnpj.length);
-    // Remove badges e status
-    let clean = afterCnpj;
-    ["ME/EPP", "Programa de integridade", "Inabilitada", "Desclassificada", "Aceita e habilitada", "Aceita"].forEach(badge => {
-      clean = clean.split(badge).join("");
+      // Nome: linhas do texto, pega a que parece nome de empresa
+      const lines = text.split("\n").map(l => l.trim()).filter(l => l.length > 3);
+      let empresa = "";
+      for (const line of lines) {
+        if (line.match(/^\d{2}\.\d{3}/) || line.includes("R$") || line.includes("Valor") || line.includes("ME/EPP") || line.includes("Programa") || line.includes("Equidade") || line.includes("Inabilitada") || line.includes("Desclassificada") || line.includes("Aceita") || line.length <= 3) continue;
+        if (line.match(/^[A-ZÀ-Ú0-9]/) && line.length > 5 && !line.match(/^[A-Z]{2}$/)) {
+          empresa = line;
+          break;
+        }
+      }
+
+      if (!empresa) return;
+
+      const isNosso = empresa.toUpperCase().includes("MANUTEC") || empresa.toUpperCase().includes("MIAMI");
+      if (isNosso) {
+        nossaPosicao = pos;
+        nossoLance = valor;
+      }
+
+      dados.classificacao.push({
+        posicao: pos++, cnpj, empresa: empresa.substring(0, 100),
+        valor_lance_final: valor, habilitado, status: statusText, nosso: isNosso,
+      });
     });
-    // Remove equidade
-    clean = clean.replace(/Equidade[^A-Z]*/g, "");
-    // Pega até "Valor"
-    const valorPos = clean.indexOf("Valor");
-    if (valorPos > 0) {
-      let nome = clean.substring(0, valorPos).trim();
-      // Remove UF no final (2 letras)
-      nome = nome.replace(/\s+[A-Z]{2}\s*$/, "").trim();
-      empresa = nome;
+  } else {
+    // Fallback: parse por texto (split por CNPJ)
+    const cnpjPattern = /\d{2}\.\d{3}\.\d{3}\/\d{4}-\d{2}/g;
+    const cnpjs = [];
+    let m;
+    while ((m = cnpjPattern.exec(bodyText)) !== null) cnpjs.push({ cnpj: m[0], index: m.index });
+
+    for (let i = 0; i < cnpjs.length; i++) {
+      const { cnpj, index: startIdx } = cnpjs[i];
+      const endIdx = i + 1 < cnpjs.length ? cnpjs[i + 1].index : startIdx + 600;
+      const bloco = bodyText.substring(startIdx, endIdx);
+
+      const valorIdx = bloco.indexOf("R$ ");
+      if (valorIdx === -1) continue;
+      const valorStr = bloco.substring(valorIdx + 3, valorIdx + 25).match(/^[\d.,]+/);
+      if (!valorStr) continue;
+      const valor = parseValor(valorStr[0]);
+      if (!valor || valor < 100) continue;
+
+      const habilitado = !bloco.includes("Inabilitada") && !bloco.includes("Desclassificada");
+      const lines = bloco.split("\n").map(l => l.trim()).filter(l => l.length > 5);
+      let empresa = "";
+      for (const line of lines) {
+        if (line.match(/^\d{2}\.\d{3}/) || line.includes("R$") || line.includes("Valor") || line.includes("ME/EPP") || line.includes("Programa") || line.includes("Equidade") || line.includes("Inabilitada") || line.includes("Desclassificada") || line.includes("Aceita")) continue;
+        if (line.match(/^[A-ZÀ-Ú0-9]/) && !line.match(/^[A-Z]{2}$/)) { empresa = line; break; }
+      }
+      if (!empresa) continue;
+
+      const isNosso = empresa.toUpperCase().includes("MANUTEC") || empresa.toUpperCase().includes("MIAMI");
+      if (isNosso) { nossaPosicao = pos; nossoLance = valor; }
+
+      dados.classificacao.push({
+        posicao: pos++, cnpj, empresa: empresa.substring(0, 100),
+        valor_lance_final: valor, habilitado, status: bloco.includes("Inabilitada") ? "Inabilitada" : bloco.includes("Desclassificada") ? "Desclassificada" : "", nosso: isNosso,
+      });
     }
-
-    if (!empresa || empresa.length < 3) continue;
-
-    const isNosso = empresa.toUpperCase().includes("MANUTEC") || empresa.toUpperCase().includes("MIAMI");
-    if (isNosso) {
-      nossaPosicao = pos;
-      nossoLance = valor;
-    }
-
-    dados.classificacao.push({
-      posicao: pos++, cnpj, empresa: empresa.substring(0, 100),
-      valor_lance_final: valor, habilitado, status: statusText, nosso: isNosso,
-    });
   }
 
   // Define nossa posição e lance
