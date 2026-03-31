@@ -467,11 +467,21 @@ async def extension_sync(request: Request):
                 (pregao_id, msg.get("remetente", "sistema"), msg.get("mensagem", ""), msg.get("horario")))
             saved["mensagens"] += 1
 
-    # Atualiza vencedor se tiver classificação
+    # Atualiza vencedor = primeira empresa HABILITADA
     if classificacao and len(classificacao) > 0:
-        vencedor = classificacao[0]
+        # Ordena por posição e pega a primeira habilitada
+        sorted_class = sorted(classificacao, key=lambda x: x.get("posicao", 999))
+        vencedor = None
+        for emp in sorted_class:
+            if emp.get("habilitado", True):
+                vencedor = emp
+                break
+        # Se nenhuma habilitada, pega a primeira
+        if not vencedor:
+            vencedor = sorted_class[0]
+
         conn.execute("""UPDATE pregoes SET vencedor_nome = ?, vencedor_valor = ?, total_participantes = ?,
-            updated_at = datetime('now') WHERE id = ?""",
+            status = 'resultado', updated_at = datetime('now') WHERE id = ?""",
             (vencedor.get("empresa"), vencedor.get("valor_lance_final"), len(classificacao), pregao_id))
 
     conn.commit()
