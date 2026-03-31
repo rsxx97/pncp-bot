@@ -77,6 +77,10 @@ CREATE TABLE IF NOT EXISTS editais (
     enviado_telegram INTEGER DEFAULT 0,
     telegram_message_id INTEGER,
 
+    -- Portal
+    uasg TEXT,
+    portal TEXT,
+
     -- Metadados
     created_at TEXT DEFAULT (datetime('now')),
     updated_at TEXT DEFAULT (datetime('now'))
