@@ -253,6 +253,10 @@ def listar_editais(
     where = []
     params = []
 
+    # Exclui editais da extensão do pipeline (vão para Pregões)
+    where.append("(fonte IS NULL OR fonte != 'extension')")
+    where.append("status != 'pregao_ext'")
+
     if status:
         placeholders = ",".join(["?"] * len(status))
         where.append(f"status IN ({placeholders})")
