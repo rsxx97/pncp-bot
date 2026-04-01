@@ -11,4 +11,4 @@ RUN mkdir -p data/editais data/planilhas data/ccts
 
 EXPOSE 8001
 
-CMD ["python", "-m", "uvicorn", "api.main:app", "--host", "0.0.0.0", "--port", "8001"]
+CMD ["python", "start.py"]
