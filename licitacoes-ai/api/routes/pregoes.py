@@ -391,20 +391,36 @@ async def extension_sync(request: Request):
     # Extrai do título/texto da página
     titulo_texto = body.get("titulo", "") or page_title
     import re
+
     uasg_match = re.search(r'UASG\s*(\d{5,6})', titulo_texto)
     if uasg_match:
         uasg = uasg_match.group(1)
     pregao_match = re.search(r'N[°º]?\s*(\d+/\d{4})', titulo_texto)
     if pregao_match:
         numero_pregao = pregao_match.group(1)
-    orgao_match = re.search(r'UASG\s*\d+\s*-\s*(.+?)(?:\s*Critério|$)', titulo_texto)
-    if orgao_match:
-        orgao_nome = orgao_match.group(1).strip()
-        # Limpa prefixos (MRJ-, MEC-, MIN-, etc.)
-        orgao_nome = re.sub(r'^[A-Z]{2,5}-', '', orgao_nome).strip()
-    # Usa orgao_nome vindo diretamente da extensão se disponível
-    if body.get("orgao_nome") and len(body.get("orgao_nome", "")) > len(orgao_nome or ""):
-        orgao_nome = body["orgao_nome"]
+
+    # Extrai nome do órgão — prioridade: campo direto > regex UASG > titulo
+    orgao_ext = body.get("orgao_nome", "")
+    # Limpa se veio com número de lei ou UASG
+    if orgao_ext and not re.match(r'^N[°º]|^UASG|^\d|^Lei|^\(', orgao_ext):
+        orgao_nome = orgao_ext
+    else:
+        # Tenta extrair do texto UASG XXX - NOME DO ORGAO
+        orgao_match = re.search(r'UASG\s*\d+\s*-\s*([A-ZÀ-Ú][A-ZÀ-Ú\s\.\-/]+?)(?:\s*Critério|\s*Modo|\s*$)', titulo_texto)
+        if orgao_match:
+            orgao_nome = orgao_match.group(1).strip()
+        # Fallback: busca "PREFEITURA|UNIVERSIDADE|TRIBUNAL|SECRETARIA..." no texto
+        if not orgao_nome:
+            nome_match = re.search(r'(PREFEITURA|UNIVERSIDADE|TRIBUNAL|SECRETARIA|INSTITUTO|MINISTÉRIO|FUNDAÇÃO|EMPRESA|COMPANHIA|AGÊNCIA)[A-ZÀ-Ú\s\.\-/]{5,60}', titulo_texto)
+            if nome_match:
+                orgao_nome = nome_match.group(0).strip()
+
+    # Limpa prefixos comuns (MRJ-, MEC-, MIN-, GOV-, etc.)
+    if orgao_nome:
+        orgao_nome = re.sub(r'^[A-Z]{2,5}-\s*', '', orgao_nome).strip()
+        # Remove sufixos ruins
+        orgao_nome = re.sub(r'\s*Critério.*$', '', orgao_nome).strip()
+        orgao_nome = re.sub(r'\s*Modo.*$', '', orgao_nome).strip()
 
     # Tenta achar pregão existente
     pregao = None

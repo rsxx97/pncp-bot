@@ -1461,3 +1461,8 @@
 01/04/2026 10:52:53 [INFO] Nenhuma nova oportunidade encontrada.
 01/04/2026 11:00:12 [INFO] Iniciando busca. 298 licitações já enviadas.
 01/04/2026 11:03:54 [WARNING] Outra instância rodando (PID 41648, desde 2026-04-01T11:00:12.043739). Abortando.
+01/04/2026 12:04:10 [WARNING] Lock stale (PID 41648, desde 2026-04-01T11:00:12.043739). Removendo.
+01/04/2026 12:04:11 [INFO] Iniciando busca. 298 licitações já enviadas.
+01/04/2026 12:04:25 [INFO] Local: 0 nova(s)
+01/04/2026 12:04:45 [WARNING] Tentativa 1 falhou (mod=6, pag=3): 502 Server Error: Bad Gateway for url: https://pncp.gov.br/api/consulta/v1/contratacoes/publicacao?dataInicial=20260325&dataFinal=20260401&codigoModalidadeContratacao=6&pagina=3&tamanhoPagina=50
+01/04/2026 12:06:29 [WARNING] Tentativa 1 falhou (mod=6, pag=9): HTTPSConnectionPool(host='pncp.gov.br', port=443): Read timed out. (read timeout=90)
