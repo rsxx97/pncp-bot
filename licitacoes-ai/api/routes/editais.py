@@ -536,6 +536,15 @@ def resetar_edital(pncp_id: str):
     return {"ok": True, "status": "novo"}
 
 
+@router.delete("/{pncp_id:path}/excluir")
+def excluir_edital(pncp_id: str):
+    """Exclui edital do pipeline."""
+    conn = get_connection()
+    conn.execute("DELETE FROM editais WHERE pncp_id = ?", (pncp_id,))
+    conn.commit()
+    return {"ok": True}
+
+
 @router.put("/{pncp_id:path}/atualizar")
 def atualizar_edital(pncp_id: str, body: dict):
     """Atualiza campos do edital."""

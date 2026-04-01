@@ -172,6 +172,13 @@ export default function EditalTable({ editais, onSelect, onRefresh }) {
                     {status === "nogo" && (
                       <Btn onClick={() => onSelect(ed.pncp_id)}>Ver motivo</Btn>
                     )}
+                    <Btn onClick={async (e) => {
+                      e.stopPropagation();
+                      if (confirm(`Excluir edital de ${ed.orgao_nome}?`)) {
+                        await fetch(`/api/editais/${ed.pncp_id}/excluir`, { method: "DELETE" });
+                        onRefresh?.();
+                      }
+                    }}>✕</Btn>
                   </div>
                 </td>
               </tr>
