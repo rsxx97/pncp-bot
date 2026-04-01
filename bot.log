@@ -1426,3 +1426,38 @@
 01/04/2026 09:55:25 [INFO]   Enviado: 39485396000140-2026-19
 01/04/2026 09:55:27 [INFO]   Enviado: 28576080000147-2026-40
 01/04/2026 09:55:28 [INFO] Concluído. 8 enviada(s) no Telegram.
+01/04/2026 10:04:33 [INFO] Iniciando busca. 298 licitações já enviadas.
+01/04/2026 10:06:12 [WARNING] Tentativa 1 falhou (mod=6, pag=6): HTTPSConnectionPool(host='pncp.gov.br', port=443): Read timed out. (read timeout=90)
+01/04/2026 10:07:54 [WARNING] Tentativa 1 falhou (mod=6, pag=7): HTTPSConnectionPool(host='pncp.gov.br', port=443): Read timed out. (read timeout=90)
+01/04/2026 10:09:29 [WARNING] Tentativa 2 falhou (mod=6, pag=7): HTTPSConnectionPool(host='pncp.gov.br', port=443): Read timed out. (read timeout=90)
+01/04/2026 10:11:10 [ERROR] Falha PNCP local (mod=6, pag=7): HTTPSConnectionPool(host='pncp.gov.br', port=443): Read timed out. (read timeout=90)
+01/04/2026 10:11:11 [INFO] Local: 0 nova(s)
+01/04/2026 10:12:50 [WARNING] Tentativa 1 falhou (mod=6, pag=7): HTTPSConnectionPool(host='pncp.gov.br', port=443): Read timed out. (read timeout=90)
+01/04/2026 10:14:28 [WARNING] Tentativa 1 falhou (mod=6, pag=9): HTTPSConnectionPool(host='pncp.gov.br', port=443): Read timed out. (read timeout=90)
+01/04/2026 10:16:19 [WARNING] Tentativa 1 falhou (mod=6, pag=22): HTTPSConnectionPool(host='pncp.gov.br', port=443): Read timed out. (read timeout=90)
+01/04/2026 10:17:58 [WARNING] Tentativa 1 falhou (mod=6, pag=25): HTTPSConnectionPool(host='pncp.gov.br', port=443): Read timed out. (read timeout=90)
+01/04/2026 10:19:34 [WARNING] Tentativa 2 falhou (mod=6, pag=25): HTTPSConnectionPool(host='pncp.gov.br', port=443): Read timed out. (read timeout=90)
+01/04/2026 10:21:19 [WARNING] Tentativa 1 falhou (mod=6, pag=30): HTTPSConnectionPool(host='pncp.gov.br', port=443): Read timed out. (read timeout=90)
+01/04/2026 10:23:10 [WARNING] Tentativa 1 falhou (mod=6, pag=46): HTTPSConnectionPool(host='pncp.gov.br', port=443): Read timed out. (read timeout=90)
+01/04/2026 10:24:49 [WARNING] Tentativa 1 falhou (mod=6, pag=49): HTTPSConnectionPool(host='pncp.gov.br', port=443): Read timed out. (read timeout=90)
+01/04/2026 10:26:26 [WARNING] Tentativa 1 falhou (mod=6, pag=50): HTTPSConnectionPool(host='pncp.gov.br', port=443): Read timed out. (read timeout=90)
+01/04/2026 10:28:11 [WARNING] Tentativa 1 falhou (mod=6, pag=59): HTTPSConnectionPool(host='pncp.gov.br', port=443): Read timed out. (read timeout=90)
+01/04/2026 10:29:49 [WARNING] Tentativa 1 falhou (mod=6, pag=61): HTTPSConnectionPool(host='pncp.gov.br', port=443): Read timed out. (read timeout=90)
+01/04/2026 10:31:28 [WARNING] Tentativa 1 falhou (mod=6, pag=65): HTTPSConnectionPool(host='pncp.gov.br', port=443): Read timed out. (read timeout=90)
+01/04/2026 10:33:05 [WARNING] Tentativa 1 falhou (mod=6, pag=66): HTTPSConnectionPool(host='pncp.gov.br', port=443): Read timed out. (read timeout=90)
+01/04/2026 10:34:41 [WARNING] Tentativa 2 falhou (mod=6, pag=66): HTTPSConnectionPool(host='pncp.gov.br', port=443): Read timed out. (read timeout=90)
+01/04/2026 10:36:25 [WARNING] Tentativa 1 falhou (mod=6, pag=70): HTTPSConnectionPool(host='pncp.gov.br', port=443): Read timed out. (read timeout=90)
+01/04/2026 10:38:03 [WARNING] Tentativa 1 falhou (mod=6, pag=72): HTTPSConnectionPool(host='pncp.gov.br', port=443): Read timed out. (read timeout=90)
+01/04/2026 10:39:39 [WARNING] Tentativa 1 falhou (mod=6, pag=73): HTTPSConnectionPool(host='pncp.gov.br', port=443): Read timed out. (read timeout=90)
+01/04/2026 10:41:17 [WARNING] Tentativa 1 falhou (mod=6, pag=75): HTTPSConnectionPool(host='pncp.gov.br', port=443): Read timed out. (read timeout=90)
+01/04/2026 10:42:53 [WARNING] Tentativa 1 falhou (mod=6, pag=76): HTTPSConnectionPool(host='pncp.gov.br', port=443): Read timed out. (read timeout=90)
+01/04/2026 10:44:34 [WARNING] Tentativa 1 falhou (mod=6, pag=81): HTTPSConnectionPool(host='pncp.gov.br', port=443): Read timed out. (read timeout=90)
+01/04/2026 10:46:14 [WARNING] Tentativa 1 falhou (mod=6, pag=86): HTTPSConnectionPool(host='pncp.gov.br', port=443): Read timed out. (read timeout=90)
+01/04/2026 10:47:54 [WARNING] Tentativa 1 falhou (mod=6, pag=90): HTTPSConnectionPool(host='pncp.gov.br', port=443): Read timed out. (read timeout=90)
+01/04/2026 10:49:35 [WARNING] Tentativa 1 falhou (mod=6, pag=95): HTTPSConnectionPool(host='pncp.gov.br', port=443): Read timed out. (read timeout=90)
+01/04/2026 10:51:11 [WARNING] Tentativa 2 falhou (mod=6, pag=95): HTTPSConnectionPool(host='pncp.gov.br', port=443): Read timed out. (read timeout=90)
+01/04/2026 10:52:53 [ERROR] Falha PNCP nacional (mod=6, pag=95): HTTPSConnectionPool(host='pncp.gov.br', port=443): Read timed out. (read timeout=90)
+01/04/2026 10:52:53 [INFO] Nacional: 0 nova(s)
+01/04/2026 10:52:53 [INFO] Nenhuma nova oportunidade encontrada.
+01/04/2026 11:00:12 [INFO] Iniciando busca. 298 licitações já enviadas.
+01/04/2026 11:03:54 [WARNING] Outra instância rodando (PID 41648, desde 2026-04-01T11:00:12.043739). Abortando.

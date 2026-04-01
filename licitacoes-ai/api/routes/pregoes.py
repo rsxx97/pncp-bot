@@ -447,7 +447,7 @@ async def extension_sync(request: Request):
                 objeto = f"{numero_pregao or 'Pregão'} - {orgao_nome or 'UASG ' + uasg}"
 
             conn.execute("""INSERT INTO editais (pncp_id, orgao_nome, objeto, valor_estimado, uf, status, score_relevancia, uasg, portal, fonte)
-                VALUES (?, ?, ?, ?, 'RJ', 'novo', 80, ?, ?, 'extension')""",
+                VALUES (?, ?, ?, ?, 'RJ', 'pregao_ext', 0, ?, ?, 'extension')""",
                 (fake_pncp_id, orgao_nome or f"UASG {uasg}", objeto, valor_teto, uasg, portal))
 
         # Cria pregão

@@ -39,8 +39,10 @@ function Dashboard({ onLogout }) {
       const params = { per_page: 50, sort: "-score_relevancia" };
       if (filter !== "todos") params.status = statusMap[filter];
       const data = await api.getEditais(params);
-      setEditais(data.items);
-      setTotalEditais(data.total);
+      // Filtra editais da extensão (vão só para Pregões, não Pipeline)
+      const pipelineItems = (data.items || []).filter(e => e.fonte !== "extension" && e.status !== "pregao_ext");
+      setEditais(pipelineItems);
+      setTotalEditais(pipelineItems.length);
     } catch (e) { console.error(e); }
   }, [filter]);
 
