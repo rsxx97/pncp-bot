@@ -25,6 +25,7 @@ export default function PncpSearch({ onImported }) {
   const [modalidade, setModalidade] = useState("");
   const [valorMin, setValorMin] = useState("");
   const [valorMax, setValorMax] = useState("");
+  const [statusFiltro, setStatusFiltro] = useState("");
 
   const buscar = async () => {
     if (!query.trim()) return;
@@ -109,6 +110,15 @@ export default function PncpSearch({ onImported }) {
           </select>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+          <label style={{ fontSize: 12, color: "#8A8A85", fontWeight: 500 }}>Status</label>
+          <select value={statusFiltro} onChange={e => setStatusFiltro(e.target.value)} style={selectStyle}>
+            <option value="">Todos</option>
+            <option value="recebendo">A Receber/Recebendo Proposta</option>
+            <option value="julgamento">Em Julgamento/Propostas Encerradas</option>
+            <option value="encerradas">Encerradas</option>
+          </select>
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
           <label style={{ fontSize: 12, color: "#8A8A85", fontWeight: 500 }}>Valor</label>
           <input placeholder="Min" value={valorMin} onChange={e => setValorMin(e.target.value.replace(/[^0-9]/g, ""))}
             style={{ ...inputStyle, width: 80, fontSize: 13, textAlign: "right" }} />
@@ -130,20 +140,31 @@ export default function PncpSearch({ onImported }) {
       )}
 
       {/* Results */}
-      {results && !loading && (
+      {results && !loading && (() => {
+        const now = new Date();
+        const filtered = results.filter(r => {
+          if (!statusFiltro) return true;
+          const enc = r.data_encerramento ? new Date(r.data_encerramento) : null;
+          const ab = r.data_abertura ? new Date(r.data_abertura) : null;
+          if (statusFiltro === "recebendo") return !enc || enc > now;
+          if (statusFiltro === "julgamento") return enc && enc <= now && (!ab || (now - enc) < 30 * 86400000);
+          if (statusFiltro === "encerradas") return enc && enc <= now;
+          return true;
+        });
+        return (
         <>
           <div style={{ fontSize: 14, color: "#8A8A85", marginBottom: 12 }}>
-            {results.length} oportunidades encontradas
+            {filtered.length} oportunidades encontradas {statusFiltro && `(filtro: ${statusFiltro})`}
           </div>
 
-          {results.length === 0 && (
+          {filtered.length === 0 && (
             <div style={{ textAlign: "center", padding: 40, color: "#AEAEA8" }}>
               Nenhuma oportunidade encontrada. Tente outros termos ou remova filtros.
             </div>
           )}
 
           <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-            {results.map(r => (
+            {filtered.map(r => (
               <div key={r.pncp_id}
                 style={{
                   background: r.ja_importado ? "#F0FDF4" : "#FFF",
@@ -192,7 +213,8 @@ export default function PncpSearch({ onImported }) {
             ))}
           </div>
         </>
-      )}
+        );
+      })()}
 
       {/* Empty state */}
       {!results && !loading && (
