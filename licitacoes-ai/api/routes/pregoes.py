@@ -466,6 +466,42 @@ async def extension_sync(request: Request):
                 VALUES (?, ?, ?, ?, 'RJ', 'pregao_ext', 0, ?, ?, 'extension')""",
                 (fake_pncp_id, orgao_nome or f"UASG {uasg}", objeto, valor_teto, uasg, portal))
 
+        # Tenta buscar dados complementares no PNCP
+        try:
+            import sys as _sys
+            _sys.path.insert(0, str(Path(__file__).parent.parent.parent))
+            from agente1_monitor.pncp_client import buscar_editais_por_texto
+            if orgao_nome and numero_pregao:
+                search_q = f"{orgao_nome} {numero_pregao}"
+            elif orgao_nome:
+                search_q = orgao_nome
+            else:
+                search_q = None
+
+            if search_q:
+                pncp_results = buscar_editais_por_texto(search_q, tam_pagina=5, paginas=1, uf=body.get("uf"))
+                if pncp_results:
+                    best = pncp_results[0]
+                    pncp_valor = best.get("valor_global") or 0
+                    pncp_orgao = best.get("orgao_nome") or ""
+                    pncp_objeto = best.get("description") or ""
+                    pncp_id_real = best.get("pncp_id") or ""
+                    # Atualiza edital com dados do PNCP
+                    updates = []
+                    vals = []
+                    if pncp_valor and pncp_valor > valor_teto:
+                        updates.append("valor_estimado = ?"); vals.append(pncp_valor)
+                    if pncp_orgao and len(pncp_orgao) > len(orgao_nome or ""):
+                        updates.append("orgao_nome = ?"); vals.append(pncp_orgao)
+                    if pncp_objeto and len(pncp_objeto) > len(objeto or ""):
+                        updates.append("objeto = ?"); vals.append(pncp_objeto)
+                    if updates:
+                        vals.append(fake_pncp_id)
+                        conn.execute(f"UPDATE editais SET {', '.join(updates)} WHERE pncp_id = ?", vals)
+                        conn.commit()
+        except Exception as _e:
+            pass  # Não bloqueia se PNCP falhar
+
         # Cria pregão
         existing_pg = conn.execute("SELECT id FROM pregoes WHERE pncp_id = ?", (fake_pncp_id,)).fetchone()
         if not existing_pg:
