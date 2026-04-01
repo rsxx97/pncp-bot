@@ -104,9 +104,16 @@ export default function PncpSearch({ onImported }) {
           <label style={{ fontSize: 12, color: "#8A8A85", fontWeight: 500 }}>Modalidade</label>
           <select value={modalidade} onChange={e => setModalidade(e.target.value)} style={selectStyle}>
             <option value="">Todas</option>
-            <option value="Pregão">Pregao</option>
-            <option value="Concorrência">Concorrencia</option>
-            <option value="Dispensa">Dispensa</option>
+            <option value="Pregão Eletrônico">Pregão Eletrônico</option>
+            <option value="Pregão Presencial">Pregão Presencial</option>
+            <option value="Concorrência">Concorrência</option>
+            <option value="Concorrência - Loss">Concorrência (Loss)</option>
+            <option value="Dispensa">Dispensa de Licitação</option>
+            <option value="Inexigibilidade">Inexigibilidade</option>
+            <option value="Manifestação de Interesse">Manifestação de Interesse</option>
+            <option value="Credenciamento">Credenciamento</option>
+            <option value="Leilão">Leilão</option>
+            <option value="Diálogo Competitivo">Diálogo Competitivo</option>
           </select>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
