@@ -38,6 +38,7 @@ export default function PncpSearch({ onImported }) {
       if (modalidade) filtros.modalidade = modalidade;
       if (valorMin) filtros.valor_min = valorMin;
       if (valorMax) filtros.valor_max = valorMax;
+      if (statusFiltro) filtros.status_pncp = statusFiltro;
       const data = await api.buscarPncp(query.trim(), filtros);
       setResults(data.items || []);
     } catch (e) {
@@ -148,30 +149,20 @@ export default function PncpSearch({ onImported }) {
 
       {/* Results */}
       {results && !loading && (() => {
-        const now = new Date();
-        const filtered = results.filter(r => {
-          if (!statusFiltro) return true;
-          const enc = r.data_encerramento ? new Date(r.data_encerramento) : null;
-          const ab = r.data_abertura ? new Date(r.data_abertura) : null;
-          if (statusFiltro === "recebendo") return !enc || enc > now;
-          if (statusFiltro === "julgamento") return enc && enc <= now && (!ab || (now - enc) < 30 * 86400000);
-          if (statusFiltro === "encerradas") return enc && enc <= now;
-          return true;
-        });
         return (
         <>
           <div style={{ fontSize: 14, color: "#8A8A85", marginBottom: 12 }}>
-            {filtered.length} oportunidades encontradas {statusFiltro && `(filtro: ${statusFiltro})`}
+            {results.length} oportunidades encontradas {statusFiltro && `(${statusFiltro})`}
           </div>
 
-          {filtered.length === 0 && (
+          {results.length === 0 && (
             <div style={{ textAlign: "center", padding: 40, color: "#AEAEA8" }}>
               Nenhuma oportunidade encontrada. Tente outros termos ou remova filtros.
             </div>
           )}
 
           <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-            {filtered.map(r => (
+            {results.map(r => (
               <div key={r.pncp_id}
                 style={{
                   background: r.ja_importado ? "#F0FDF4" : "#FFF",

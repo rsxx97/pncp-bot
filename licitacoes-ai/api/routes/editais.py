@@ -73,14 +73,22 @@ def buscar_pncp(
     modalidade: str = Query(None),
     valor_min: float = Query(None),
     valor_max: float = Query(None),
+    status_pncp: str = Query(None),
 ):
     """Busca editais no PNCP por texto com filtros opcionais."""
     import sys
     sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
     from agente1_monitor.pncp_client import buscar_editais_por_texto
-    # Busca mais resultados para permitir filtros client-side eficazes
-    items = buscar_editais_por_texto(q, tam_pagina=50, paginas=3)
+    # Mapeia status do frontend para PNCP
+    status_map = {
+        "recebendo": "recebendo_proposta",
+        "julgamento": "propostas_encerradas",
+        "encerradas": "encerrada",
+    }
+    pncp_status = status_map.get(status_pncp) if status_pncp else None
+    # Passa UF e status diretamente para a API do PNCP
+    items = buscar_editais_por_texto(q, tam_pagina=50, paginas=3, status=pncp_status, uf=uf)
 
     # Aplica filtros server-side
     filtered = []

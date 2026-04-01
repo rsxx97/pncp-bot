@@ -251,10 +251,11 @@ def buscar_edital_por_id(cnpj: str, ano: int, seq: int) -> EditalResumo | None:
         return None
 
 
-def buscar_editais_por_texto(query: str, tam_pagina: int = 20, paginas: int = 1) -> list[dict]:
+def buscar_editais_por_texto(query: str, tam_pagina: int = 20, paginas: int = 1, status: str = None, uf: str = None) -> list[dict]:
     """Busca editais no PNCP por texto livre (objeto, orgao, etc).
 
     Usa o endpoint /api/search/ do portal PNCP.
+    status: recebendo_proposta | em_julgamento | encerrada
     Retorna lista de dicts com dados do edital.
     """
     url = "https://pncp.gov.br/api/search/"
@@ -263,12 +264,17 @@ def buscar_editais_por_texto(query: str, tam_pagina: int = 20, paginas: int = 1)
         with httpx.Client(timeout=30) as client:
             for pag in range(1, paginas + 1):
                 _rate_limit()
-                resp = client.get(url, params={
+                params = {
                     "q": query,
                     "tipos_documento": "edital",
                     "pagina": pag,
                     "tam_pagina": tam_pagina,
-                })
+                }
+                if status:
+                    params["status"] = status
+                if uf:
+                    params["uf"] = uf
+                resp = client.get(url, params=params)
                 if resp.status_code != 200:
                     log.warning(f"Search PNCP retornou {resp.status_code}")
                     break

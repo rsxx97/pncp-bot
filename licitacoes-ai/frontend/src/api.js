@@ -52,6 +52,7 @@ export const api = {
     if (filtros.modalidade) qs.set('modalidade', filtros.modalidade);
     if (filtros.valor_min) qs.set('valor_min', filtros.valor_min);
     if (filtros.valor_max) qs.set('valor_max', filtros.valor_max);
+    if (filtros.status_pncp) qs.set('status_pncp', filtros.status_pncp);
     return request(`/api/editais/pncp/buscar?${qs.toString()}`);
   },
   importarPncp: (pncpIds) => request('/api/editais/pncp/importar', { method: 'POST', body: JSON.stringify({ pncp_ids: pncpIds }) }),
