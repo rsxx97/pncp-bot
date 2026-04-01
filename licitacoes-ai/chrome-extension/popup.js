@@ -11,7 +11,6 @@ function showTab(tab) {
   document.getElementById(`tab-${tab}`).classList.add("active");
   document.getElementById(`tab-${tab}`).classList.remove("inactive");
 }
-window.showTab = showTab;
 
 // ══════════════════════════════════════════════
 // CAPTURA (tab existente melhorada)
@@ -141,6 +140,11 @@ function checkSugestao() {
 // ══════════════════════════════════════════════
 
 document.addEventListener("DOMContentLoaded", () => {
+  // Tab navigation
+  document.querySelectorAll("[data-tab]").forEach(btn => {
+    btn.addEventListener("click", () => showTab(btn.dataset.tab));
+  });
+
   checkDashboard();
   checkStatus();
   updateCaptura();

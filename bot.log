@@ -1466,3 +1466,17 @@
 01/04/2026 12:04:25 [INFO] Local: 0 nova(s)
 01/04/2026 12:04:45 [WARNING] Tentativa 1 falhou (mod=6, pag=3): 502 Server Error: Bad Gateway for url: https://pncp.gov.br/api/consulta/v1/contratacoes/publicacao?dataInicial=20260325&dataFinal=20260401&codigoModalidadeContratacao=6&pagina=3&tamanhoPagina=50
 01/04/2026 12:06:29 [WARNING] Tentativa 1 falhou (mod=6, pag=9): HTTPSConnectionPool(host='pncp.gov.br', port=443): Read timed out. (read timeout=90)
+01/04/2026 12:09:08 [WARNING] Tentativa 1 falhou (mod=6, pag=66): HTTPSConnectionPool(host='pncp.gov.br', port=443): Read timed out. (read timeout=90)
+01/04/2026 12:11:17 [WARNING] Tentativa 1 falhou (mod=6, pag=98): HTTPSConnectionPool(host='pncp.gov.br', port=443): Read timed out. (read timeout=90)
+01/04/2026 12:13:06 [WARNING] Tentativa 1 falhou (mod=6, pag=108): HTTPSConnectionPool(host='pncp.gov.br', port=443): Read timed out. (read timeout=90)
+01/04/2026 12:14:49 [WARNING] Tentativa 1 falhou (mod=6, pag=113): HTTPSConnectionPool(host='pncp.gov.br', port=443): Read timed out. (read timeout=90)
+01/04/2026 12:16:41 [WARNING] Tentativa 1 falhou (mod=6, pag=127): HTTPSConnectionPool(host='pncp.gov.br', port=443): Read timed out. (read timeout=90)
+01/04/2026 12:18:20 [WARNING] Tentativa 1 falhou (mod=6, pag=130): HTTPSConnectionPool(host='pncp.gov.br', port=443): Read timed out. (read timeout=90)
+01/04/2026 12:19:58 [WARNING] Tentativa 1 falhou (mod=6, pag=132): HTTPSConnectionPool(host='pncp.gov.br', port=443): Read timed out. (read timeout=90)
+01/04/2026 12:21:53 [WARNING] Tentativa 1 falhou (mod=6, pag=150): HTTPSConnectionPool(host='pncp.gov.br', port=443): Read timed out. (read timeout=90)
+01/04/2026 12:23:55 [WARNING] Tentativa 1 falhou (mod=6, pag=174): HTTPSConnectionPool(host='pncp.gov.br', port=443): Read timed out. (read timeout=90)
+01/04/2026 12:24:21 [INFO] Nacional: 2 nova(s)
+01/04/2026 12:24:21 [INFO] Total: 2 nova(s) oportunidade(s). Enviando...
+01/04/2026 12:24:23 [INFO]   Enviado: 62070362000106-2026-207
+01/04/2026 12:24:25 [INFO]   Enviado: 62070362000106-2026-215
+01/04/2026 12:24:26 [INFO] Concluído. 2 enviada(s) no Telegram.
