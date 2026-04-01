@@ -104,6 +104,21 @@ def get_funnel(period: str = Query("90d")):
     }
 
 
+@router.post("/monitor/executar")
+def executar_monitor_manual(dias: int = 10):
+    """Executa o monitor PNCP manualmente."""
+    import sys
+    from pathlib import Path
+    sys.path.insert(0, str(Path(__file__).parent.parent.parent))
+    try:
+        from agente1_monitor.main import executar_monitor
+        result = executar_monitor(usar_llm=False, dias_retroativos=dias, incluir_nacional=False)
+        stats = result.get("stats", {})
+        return {"ok": True, "stats": stats}
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
+
+
 @router.get("/volume-by-status")
 def get_volume_by_status(period: str = Query("90d")):
     conn = get_connection()
