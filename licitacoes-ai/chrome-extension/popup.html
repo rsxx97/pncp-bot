@@ -3,59 +3,151 @@
 <head>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { width: 320px; font-family: 'Segoe UI', sans-serif; background: #09090B; color: #EEEEE8; padding: 16px; }
-    .header { display: flex; align-items: center; gap: 8px; margin-bottom: 16px; }
+    body { width: 360px; font-family: 'Segoe UI', sans-serif; background: #09090B; color: #EEEEE8; padding: 14px; }
+    .header { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
     .header h1 { font-size: 14px; font-weight: 700; }
-    .header .badge { font-size: 10px; background: #BEFF3A; color: #09090B; padding: 2px 8px; border-radius: 4px; font-weight: 700; }
-    .status { background: #111114; border: 1px solid #2A2A32; border-radius: 8px; padding: 12px; margin-bottom: 12px; }
-    .status-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
-    .status-label { font-size: 11px; color: #5A5854; }
-    .status-value { font-size: 11px; color: #EEEEE8; font-weight: 600; }
-    .status-value.online { color: #2EDDA8; }
-    .status-value.offline { color: #FF4D4D; }
-    .btn { width: 100%; padding: 10px; border: none; border-radius: 8px; font-size: 12px; font-weight: 700; cursor: pointer; margin-bottom: 8px; }
+    .header .badge { font-size: 9px; background: #BEFF3A; color: #09090B; padding: 2px 6px; border-radius: 4px; font-weight: 700; }
+    .tabs { display: flex; gap: 4px; margin-bottom: 12px; }
+    .tab { flex: 1; padding: 6px; border: none; border-radius: 6px; font-size: 10px; font-weight: 600; cursor: pointer; text-align: center; }
+    .tab.active { background: #BEFF3A; color: #09090B; }
+    .tab.inactive { background: #222228; color: #5A5854; }
+    .panel { display: none; }
+    .panel.active { display: block; }
+    .card { background: #111114; border: 1px solid #2A2A32; border-radius: 8px; padding: 10px; margin-bottom: 8px; }
+    .row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; }
+    .label { font-size: 10px; color: #5A5854; text-transform: uppercase; letter-spacing: 0.5px; }
+    .value { font-size: 11px; color: #EEEEE8; font-weight: 600; font-family: monospace; }
+    .value.green { color: #2EDDA8; }
+    .value.red { color: #FF4D4D; }
+    .value.yellow { color: #FFB038; }
+    .value.blue { color: #5A9EF7; }
+    .value.accent { color: #BEFF3A; }
+    .btn { width: 100%; padding: 8px; border: none; border-radius: 6px; font-size: 11px; font-weight: 700; cursor: pointer; margin-bottom: 6px; }
     .btn-primary { background: #BEFF3A; color: #09090B; }
+    .btn-danger { background: #FF4D4D; color: #FFF; }
     .btn-secondary { background: #222228; color: #EEEEE8; }
     .btn:hover { opacity: 0.9; }
-    .dados { background: #111114; border: 1px solid #2A2A32; border-radius: 8px; padding: 12px; margin-top: 8px; font-size: 11px; max-height: 200px; overflow-y: auto; }
-    .dados-item { padding: 4px 0; border-bottom: 1px solid #1A1A20; }
+    .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+    select, input { width: 100%; padding: 6px 8px; background: #18181C; border: 1px solid #2A2A32; border-radius: 6px; color: #EEEEE8; font-size: 11px; font-family: monospace; outline: none; margin-bottom: 6px; }
+    .dados { background: #111114; border: 1px solid #2A2A32; border-radius: 8px; padding: 8px; margin-top: 6px; font-size: 10px; max-height: 160px; overflow-y: auto; }
+    .dados-item { padding: 3px 0; border-bottom: 1px solid #1A1A20; display: flex; justify-content: space-between; }
     .dados-item:last-child { border-bottom: none; }
-    .empresa { color: #BEFF3A; }
-    .valor { color: #5A9EF7; font-family: monospace; }
-    .empty { color: #5A5854; text-align: center; padding: 20px 0; }
-    .link { color: #5A9EF7; text-decoration: none; font-size: 11px; display: block; text-align: center; margin-top: 8px; }
+    .empresa { color: #BEFF3A; font-size: 10px; }
+    .nosso { background: #BEFF3A1a; padding: 1px 4px; border-radius: 3px; }
+    .inab { color: #FF4D4D; }
+    .valor { color: #5A9EF7; font-family: monospace; font-size: 10px; }
+    .empty { color: #5A5854; text-align: center; padding: 12px 0; font-size: 11px; }
+    .link { color: #5A9EF7; text-decoration: none; font-size: 10px; display: block; text-align: center; margin-top: 6px; }
+    .sugestao { background: #BEFF3A1a; border: 1px solid #BEFF3A44; border-radius: 8px; padding: 10px; margin-bottom: 8px; }
+    .sugestao h3 { font-size: 11px; color: #BEFF3A; margin-bottom: 4px; }
+    .sugestao .big { font-size: 18px; font-weight: 700; color: #BEFF3A; font-family: monospace; }
+    .sugestao .motivo { font-size: 10px; color: #98968E; margin-top: 4px; }
+    hr { border: none; border-top: 1px solid #2A2A32; margin: 8px 0; }
   </style>
 </head>
 <body>
   <div class="header">
     <h1>Licitacoes AI</h1>
-    <span class="badge">EXTENSION</span>
+    <span class="badge">v2.0</span>
+    <span class="badge" id="robot-badge" style="display:none;background:#FF4D4D;color:#FFF">ROBOT OFF</span>
   </div>
 
-  <div class="status">
-    <div class="status-row">
-      <span class="status-label">Pagina</span>
-      <span class="status-value" id="pagina">—</span>
+  <!-- Tabs -->
+  <div class="tabs">
+    <button class="tab active" id="tab-captura" onclick="showTab('captura')">Captura</button>
+    <button class="tab inactive" id="tab-robot" onclick="showTab('robot')">Robô</button>
+    <button class="tab inactive" id="tab-config" onclick="showTab('config')">Config</button>
+  </div>
+
+  <!-- Tab Captura -->
+  <div class="panel active" id="panel-captura">
+    <div class="card">
+      <div class="row"><span class="label">Portal</span><span class="value blue" id="portal">—</span></div>
+      <div class="row"><span class="label">Página</span><span class="value" id="pagina">—</span></div>
+      <div class="row"><span class="label">Dashboard</span><span class="value" id="dashboard">verificando...</span></div>
+      <div class="row"><span class="label">Última captura</span><span class="value" id="ultima">—</span></div>
+      <div class="row"><span class="label">Empresas</span><span class="value accent" id="contagem">0</span></div>
+      <div class="row"><span class="label">Form lance</span><span class="value" id="form-lance">—</span></div>
     </div>
-    <div class="status-row">
-      <span class="status-label">Dashboard</span>
-      <span class="status-value" id="dashboard">verificando...</span>
-    </div>
-    <div class="status-row">
-      <span class="status-label">Ultima captura</span>
-      <span class="status-value" id="ultima">—</span>
-    </div>
-    <div class="status-row">
-      <span class="status-label">Dados capturados</span>
-      <span class="status-value" id="contagem">—</span>
+
+    <button class="btn btn-primary" id="capturar">⚡ Capturar Agora</button>
+    <button class="btn btn-secondary" id="abrir">Abrir Dashboard</button>
+
+    <div class="dados" id="dados">
+      <div class="empty">Abra um pregão no ComprasGov para capturar dados.</div>
     </div>
   </div>
 
-  <button class="btn btn-primary" id="capturar">Capturar Agora</button>
-  <button class="btn btn-secondary" id="abrir">Abrir Dashboard</button>
+  <!-- Tab Robô -->
+  <div class="panel" id="panel-robot">
+    <div id="sugestao-container" style="display:none">
+      <div class="sugestao">
+        <h3>🤖 Sugestão de Lance</h3>
+        <div class="big" id="lance-sugerido">R$ 0,00</div>
+        <div class="row"><span class="label">Estratégia</span><span class="value" id="estrategia-usada">—</span></div>
+        <div class="row"><span class="label">Desconto</span><span class="value green" id="desconto-sugerido">—</span></div>
+        <div class="motivo" id="motivo-lance">—</div>
+      </div>
+      <button class="btn btn-primary" id="confirmar-lance">✅ Confirmar e Enviar Lance</button>
+      <button class="btn btn-secondary" id="rejeitar-lance">❌ Rejeitar</button>
+      <hr>
+    </div>
 
-  <div class="dados" id="dados">
-    <div class="empty">Nenhum dado capturado ainda. Abra um pregao no ComprasGov.</div>
+    <div class="card">
+      <div class="row"><span class="label">Status robô</span><span class="value" id="robot-status">Desativado</span></div>
+      <div class="row"><span class="label">Modo</span><span class="value" id="robot-modo">—</span></div>
+      <div class="row"><span class="label">Estratégia</span><span class="value" id="robot-estrategia">—</span></div>
+      <div class="row"><span class="label">Lances enviados</span><span class="value accent" id="robot-lances">0</span></div>
+      <div class="row"><span class="label">Último lance</span><span class="value" id="robot-ultimo">—</span></div>
+    </div>
+
+    <button class="btn btn-primary" id="iniciar-robot" style="display:block">▶ Iniciar Robô</button>
+    <button class="btn btn-danger" id="parar-robot" style="display:none">⏹ Parar Robô</button>
+
+    <div class="card" style="margin-top:8px">
+      <div class="label" style="margin-bottom:4px">Lance manual</div>
+      <input type="text" id="lance-manual-valor" placeholder="R$ 0,00">
+      <button class="btn btn-secondary" id="lance-manual-btn">Enviar Lance Manual</button>
+    </div>
+  </div>
+
+  <!-- Tab Config -->
+  <div class="panel" id="panel-config">
+    <div class="card">
+      <div class="label" style="margin-bottom:4px">Modo</div>
+      <select id="cfg-modo">
+        <option value="semi_auto">Semi-automático (confirma)</option>
+        <option value="auto">Automático (dentro dos limites)</option>
+      </select>
+
+      <div class="label" style="margin-bottom:4px">Estratégia</div>
+      <select id="cfg-estrategia">
+        <option value="conservador">Conservador (-0.5%)</option>
+        <option value="agressivo">Agressivo (mínimo rentável)</option>
+        <option value="espelho">Espelho (líder -R$1)</option>
+        <option value="decremental">Decremental (-1% por rodada)</option>
+        <option value="piso">Piso (inexequibilidade +1%)</option>
+      </select>
+
+      <div class="label" style="margin-bottom:4px">Valor mínimo (R$)</div>
+      <input type="text" id="cfg-valor-min" placeholder="0.00">
+
+      <div class="label" style="margin-bottom:4px">Desconto máximo (%)</div>
+      <input type="text" id="cfg-desconto-max" value="25">
+
+      <div class="label" style="margin-bottom:4px">Intervalo entre lances (seg)</div>
+      <input type="text" id="cfg-intervalo" value="10">
+
+      <div class="label" style="margin-bottom:4px">Nossa empresa</div>
+      <select id="cfg-empresa">
+        <option value="MANUTEC">Manutec</option>
+        <option value="MIAMI SEGURANCA">Miami Segurança</option>
+        <option value="MIAMI SERVICOS">Miami Serviços</option>
+      </select>
+    </div>
+
+    <button class="btn btn-primary" id="salvar-config">💾 Salvar Configuração</button>
+    <button class="btn btn-secondary" id="carregar-config">🔄 Carregar do Servidor</button>
   </div>
 
   <a href="https://pncp-bot-production.up.railway.app" target="_blank" class="link">Abrir Dashboard Licitacoes AI</a>

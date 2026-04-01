@@ -400,6 +400,11 @@ async def extension_sync(request: Request):
     orgao_match = re.search(r'UASG\s*\d+\s*-\s*(.+?)(?:\s*Critério|$)', titulo_texto)
     if orgao_match:
         orgao_nome = orgao_match.group(1).strip()
+        # Limpa prefixos (MRJ-, MEC-, MIN-, etc.)
+        orgao_nome = re.sub(r'^[A-Z]{2,5}-', '', orgao_nome).strip()
+    # Usa orgao_nome vindo diretamente da extensão se disponível
+    if body.get("orgao_nome") and len(body.get("orgao_nome", "")) > len(orgao_nome or ""):
+        orgao_nome = body["orgao_nome"]
 
     # Tenta achar pregão existente
     pregao = None

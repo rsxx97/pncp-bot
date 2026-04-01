@@ -25,7 +25,7 @@
         "https://*.comprasnet.gov.br/*",
         "https://*.compras.gov.br/*"
       ],
-      "js": ["content.js"],
+      "js": ["content.js", "robot.js"],
       "run_at": "document_idle"
     },
     {
@@ -34,7 +34,7 @@
         "https://*.siga.rj.gov.br/*",
         "https://*.fazenda.rj.gov.br/*"
       ],
-      "js": ["content.js"],
+      "js": ["content.js", "robot.js"],
       "run_at": "document_idle"
     },
     {
@@ -42,7 +42,7 @@
         "https://*.licitacoes-e.com.br/*",
         "https://licitacoes-e2.bb.com.br/*"
       ],
-      "js": ["content.js"],
+      "js": ["content.js", "robot.js"],
       "run_at": "document_idle"
     },
     {
@@ -50,14 +50,14 @@
         "https://*.bllcompras.com/*",
         "https://*.bll.org.br/*"
       ],
-      "js": ["content.js"],
+      "js": ["content.js", "robot.js"],
       "run_at": "document_idle"
     },
     {
       "matches": [
         "https://*.portaldecompraspublicas.com.br/*"
       ],
-      "js": ["content.js"],
+      "js": ["content.js", "robot.js"],
       "run_at": "document_idle"
     }
   ],

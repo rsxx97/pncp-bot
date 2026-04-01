@@ -166,7 +166,10 @@ function extrairComprasGov() {
   const uasgMatch = bodyText.match(/UASG\s*(\d+)\s*-\s*([^\n]+)/);
   if (uasgMatch) {
     dados.uasg = uasgMatch[1];
-    dados.orgao_nome = uasgMatch[2].trim().split(/\s+Crit/)[0].trim();
+    let orgao = uasgMatch[2].trim().split(/\s+Crit/)[0].trim();
+    // Limpa prefixos comuns (MRJ-, MEC-, MIN-, etc.)
+    orgao = orgao.replace(/^[A-Z]{2,5}-/, "").trim();
+    dados.orgao_nome = orgao;
   }
 
   // Número do pregão
