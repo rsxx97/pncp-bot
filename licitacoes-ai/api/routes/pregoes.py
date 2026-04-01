@@ -631,6 +631,30 @@ def remover_classificacao(pregao_id: int, class_id: int):
     return {"ok": True}
 
 
+@router.delete("/{pregao_id}/excluir")
+def excluir_pregao(pregao_id: int):
+    """Exclui pregão e todos os dados relacionados."""
+    conn = get_connection()
+    pregao = conn.execute("SELECT pncp_id FROM pregoes WHERE id = ?", (pregao_id,)).fetchone()
+    if not pregao:
+        raise HTTPException(404, "Pregão não encontrado")
+
+    # Exclui dados relacionados
+    conn.execute("DELETE FROM pregao_classificacao WHERE pregao_id = ?", (pregao_id,))
+    conn.execute("DELETE FROM lances WHERE pregao_id = ?", (pregao_id,))
+    conn.execute("DELETE FROM chat_pregao WHERE pregao_id = ?", (pregao_id,))
+    conn.execute("DELETE FROM pregao_eventos WHERE pregao_id = ?", (pregao_id,))
+    conn.execute("DELETE FROM pregoes WHERE id = ?", (pregao_id,))
+
+    # Exclui edital da extensão se existir
+    pncp_id = pregao["pncp_id"]
+    if pncp_id and pncp_id.startswith("EXT-"):
+        conn.execute("DELETE FROM editais WHERE pncp_id = ?", (pncp_id,))
+
+    conn.commit()
+    return {"ok": True}
+
+
 # ── Sync da Chrome Extension ──
 
 class ComprasGovSyncData(BaseModel):

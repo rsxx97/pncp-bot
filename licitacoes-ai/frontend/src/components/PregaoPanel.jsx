@@ -216,7 +216,15 @@ function PregaoDetalhe({ pregaoId, onBack }) {
       {/* Header */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
         <div>
-          <button onClick={onBack} style={{ ...btnStyle, background: D.s3, color: D.t2, marginBottom: 8 }}>← Voltar</button>
+          <div style={{ display: "flex", gap: 8, marginBottom: 8 }}>
+            <button onClick={onBack} style={{ ...btnStyle, background: D.s3, color: D.t2 }}>← Voltar</button>
+            <button onClick={async () => {
+              if (confirm(`Excluir pregão de ${pregao.orgao_nome}?`)) {
+                await fetch(`/api/pregoes/${pregaoId}/excluir`, { method: "DELETE" });
+                onBack();
+              }
+            }} style={{ ...btnStyle, background: D.rd + "22", color: D.rd, border: `1px solid ${D.rd}44` }}>✕ Excluir</button>
+          </div>
           <div style={{ fontSize: 16, fontWeight: 700, color: D.t1 }}>{pregao.orgao_nome}</div>
           <div style={{ fontSize: 12, color: D.t2, marginTop: 2 }}>{pregao.objeto?.substring(0, 80)}</div>
         </div>
