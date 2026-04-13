@@ -230,3 +230,27 @@ def seed():
         upsert_concorrente(cnpj=cnpj, razao_social=c.get("razao_social", ""), nome_fantasia=c.get("nome_fantasia", ""), segmentos=c.get("segmentos", []), notas=c.get("notas", ""))
         count += 1
     return {"importados": count}
+
+
+# ── Inteligência Competitiva ──
+
+@router.get("/intel/precos")
+def precos_praticados(tipo_servico: str = Query("limpeza"), uf: str = Query("RJ")):
+    """Consulta preços praticados por tipo de serviço e UF."""
+    try:
+        from agente4_competitivo.pncp_resultados import consultar_precos_praticados
+        return consultar_precos_praticados(tipo_servico, uf)
+    except Exception as e:
+        return {"total": 0, "erro": str(e)}
+
+
+@router.post("/intel/buscar")
+def buscar_intel(tipo_servico: str = Query("limpeza"), uf: str = Query("RJ"), dias: int = Query(180)):
+    """Busca resultados de pregões no PNCP e salva na base de inteligência."""
+    try:
+        from agente4_competitivo.pncp_resultados import buscar_resultados_pncp, salvar_resultados_banco
+        resultados = buscar_resultados_pncp(uf=uf, tipo_servico=tipo_servico, dias_retroativos=dias)
+        salvos = salvar_resultados_banco(resultados)
+        return {"ok": True, "encontrados": len(resultados), "novos_salvos": salvos}
+    except Exception as e:
+        return {"ok": False, "erro": str(e)}
