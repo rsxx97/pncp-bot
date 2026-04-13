@@ -157,7 +157,7 @@ def executar_monitor(
             status=status,
         )
         db_dict["justificativa_score"] = classificacao.justificativa
-        db_dict["notificado_telegram"] = 1  # Marca como notificado para evitar reenvio
+        db_dict["enviado_telegram"] = 1  # Marca como notificado para evitar reenvio
         upsert_edital(db_dict)
 
     # Atualiza estado do monitor
