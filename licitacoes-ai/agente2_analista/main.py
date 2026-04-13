@@ -189,6 +189,52 @@ def _analisar_edital_pdf(pdf_path: Path, pncp_id: str, tr_path: Path = None) -> 
 
 # ─── Fase 3: Analisar TR (postos, CCT, benefícios) ───────────────
 
+def _formatar_postos_tabela(postos: list) -> str:
+    """Formata postos extraídos da tabela para incluir no prompt."""
+    if not postos:
+        return ""
+    lines = []
+    for i, p in enumerate(postos, 1):
+        funcao = p.get("funcao_display", p.get("funcao", "?"))
+        qtd = p.get("quantidade", "?")
+        jornada = p.get("jornada", "?")
+        cbo = p.get("cbo", "")
+        lines.append(f"  {i}. {funcao} x{qtd} ({jornada}) {f'CBO: {cbo}' if cbo else ''}")
+    return "\n".join(lines)
+
+
+def _preparar_texto_tr(texto: str) -> str:
+    """Prepara texto do TR para envio ao LLM — prioriza seções relevantes."""
+    from agente2_analista.prompts import _extrair_secoes_relevantes
+    MAX = 40000
+    if len(texto) <= MAX:
+        return texto
+    return _extrair_secoes_relevantes(texto, MAX)
+
+
+def _enriquecer_postos_tabela(postos_tabela: list, llm_postos: list):
+    """Enriquece postos da tabela com dados do LLM (jornada, adicionais, CCT)."""
+    for pt in postos_tabela:
+        funcao_tab = (pt.get("funcao", "") or "").lower()
+        for pl in llm_postos:
+            funcao_llm = (pl.get("funcao", "") or "").lower()
+            # Match por similaridade
+            if funcao_tab in funcao_llm or funcao_llm in funcao_tab:
+                # Enriquece com dados que a tabela não tem
+                if not pt.get("jornada") or pt["jornada"] == "44h":
+                    if pl.get("jornada"):
+                        pt["jornada"] = pl["jornada"]
+                if pl.get("adicional_periculosidade"):
+                    pt["adicional_periculosidade"] = True
+                if pl.get("adicional_insalubridade"):
+                    pt["adicional_insalubridade"] = True
+                if pl.get("adicional_noturno"):
+                    pt["adicional_noturno"] = True
+                if pl.get("salario_base") and not pt.get("salario_base"):
+                    pt["salario_base"] = pl["salario_base"]
+                break
+
+
 def _analisar_tr_pdf(tr_path: Path, analise_edital: dict, pncp_id: str) -> dict:
     """Analisa o Termo de Referência com foco em postos e CCT.
 
@@ -262,12 +308,15 @@ Responda APENAS com JSON válido:
   ]
 }}
 
+DADOS JÁ EXTRAÍDOS DAS TABELAS DO PDF (use como referência/validação):
+{_formatar_postos_tabela(postos_tabela) if postos_tabela else 'Nenhuma tabela de postos encontrada no PDF. Extraia do texto.'}
+
 TERMO DE REFERÊNCIA:
-{texto_tr[:25000]}"""
+{_preparar_texto_tr(texto_tr)}"""
 
     try:
         tr_dados = ask_claude_json(
-            system="Você é um especialista em precificação de licitações. Extraia dados para montar planilha de custos.",
+            system="Você é um especialista em precificação de licitações. Extraia dados para montar planilha de custos IN 05/2017. Se dados de tabela foram fornecidos, VALIDE e COMPLEMENTE com informações do texto (jornada, adicionais, CCT).",
             user=prompt_tr,
             max_tokens=4096,
             agente="analista_tr",
@@ -279,8 +328,12 @@ TERMO DE REFERÊNCIA:
 
     # Postos da tabela têm prioridade (mais precisos)
     if postos_tabela and len(postos_tabela) > 0:
+        # Se LLM retornou postos, pega jornadas/adicionais do LLM e aplica na tabela
+        llm_postos = tr_dados.get("postos_trabalho", [])
+        if llm_postos:
+            _enriquecer_postos_tabela(postos_tabela, llm_postos)
         tr_dados["postos_trabalho"] = postos_tabela
-        tr_dados["_postos_fonte"] = "tabela_pdf"
+        tr_dados["_postos_fonte"] = "tabela_pdf_enriquecida"
     elif tr_dados.get("postos_trabalho"):
         tr_dados["_postos_fonte"] = "llm_tr"
 
