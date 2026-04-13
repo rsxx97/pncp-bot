@@ -12,7 +12,7 @@ import sys
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from shared.database import init_db
-from api.routes import dashboard, editais, concorrentes, config, auth, perfil, pregoes, lances_robot
+from api.routes import dashboard, editais, concorrentes, config, auth, perfil, pregoes, lances_robot, alertas
 
 log = logging.getLogger("api")
 
@@ -37,6 +37,7 @@ app.include_router(auth.router)
 app.include_router(perfil.router)
 app.include_router(pregoes.router)
 app.include_router(lances_robot.router)
+app.include_router(alertas.router)
 
 
 @app.get("/api/health")
