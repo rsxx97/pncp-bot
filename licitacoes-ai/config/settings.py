@@ -26,6 +26,11 @@ PNCP_BASE_URL = "https://pncp.gov.br/api/consulta/v1"
 
 # Configurações de negócio
 ESTADO_FOCO = os.getenv("ESTADO_FOCO", "RJ")
+# Lista de UFs monitoradas. Aceita "RJ", "RJ,SC", etc. Default: RJ + SC (obras/reforma).
+UFS_FOCO = [u.strip().upper() for u in os.getenv("UFS_FOCO", ESTADO_FOCO).split(",") if u.strip()]
+# Keywords específicas por UF (se vazio, usa KEYWORDS_INTERESSE genérico).
+# SC removido: agora aceita TODO estado (obras + reforma + terceirização + MDO) via KEYWORDS_INTERESSE.
+KEYWORDS_POR_UF = {}
 SCORE_MINIMO = int(os.getenv("SCORE_MINIMO", "60"))
 INTERVALO_MONITOR_MINUTOS = int(os.getenv("INTERVALO_MONITOR_MINUTOS", "30"))
 

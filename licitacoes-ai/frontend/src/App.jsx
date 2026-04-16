@@ -7,6 +7,9 @@ import PncpSearch from "./components/PncpSearch";
 import Perfil from "./components/Perfil";
 import ConcorrentePanel from "./components/ConcorrentePanel";
 import PregaoPanel from "./components/PregaoPanel";
+import PlanilhaPanel from "./components/PlanilhaPanel";
+import PipelinePage from "./components/PipelinePage";
+import HabilitacaoPage from "./components/HabilitacaoPage";
 import Login from "./components/Login";
 
 const C = {
@@ -72,7 +75,7 @@ function Dashboard({ onLogout }) {
         ::-webkit-scrollbar-thumb { background: ${C.b2}; border-radius: 3px; }
       `}</style>
 
-      <div style={{ maxWidth: 1060, margin: "0 auto", padding: "0 16px", position: "relative", zIndex: 1 }}>
+      <div style={{ maxWidth: tab === "pipeline" ? 1400 : 1060, margin: "0 auto", padding: "0 16px", position: "relative", zIndex: 1 }}>
         {/* Header */}
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "20px 0 24px", flexWrap: "wrap", gap: 12 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
@@ -103,6 +106,8 @@ function Dashboard({ onLogout }) {
             { key: "pipeline", label: "Pipeline" },
             { key: "buscar", label: "Oportunidades" },
             { key: "pregoes", label: "Pregões" },
+            { key: "planilhas", label: "Planilhas" },
+            { key: "habilitacao", label: "Habilitação" },
             { key: "concorrentes", label: "Concorrentes" },
             { key: "perfil", label: "Empresas" },
           ].map(t => (
@@ -118,47 +123,7 @@ function Dashboard({ onLogout }) {
           ))}
         </div>
 
-        {tab === "pipeline" && (
-          <>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12, flexWrap: "wrap", gap: 10 }}>
-              <div style={{ display: "flex", gap: 6 }}>
-                {filters.map(f => (
-                  <button key={f.key} onClick={() => setFilter(f.key)}
-                    style={{
-                      fontFamily: mono, fontSize: 10, padding: "5px 12px", borderRadius: 6, cursor: "pointer", fontWeight: 600,
-                      border: `1px solid ${filter === f.key ? C.b2 : C.b1}`,
-                      background: filter === f.key ? C.s3 : "transparent",
-                      color: filter === f.key ? C.t1 : C.t3,
-                    }}>
-                    {f.label} ({f.count})
-                  </button>
-                ))}
-              </div>
-            </div>
-            <div style={{ marginBottom: 10 }}>
-              <input
-                placeholder="Buscar por orgao, objeto, empresa..."
-                value={searchText}
-                onChange={e => setSearchText(e.target.value)}
-                style={{
-                  width: "100%", padding: "8px 14px", boxSizing: "border-box", outline: "none",
-                  background: C.s2, border: `1px solid ${C.b1}`, borderRadius: 8,
-                  fontSize: 12, color: C.t1, fontFamily: mono,
-                }}
-              />
-            </div>
-            <div style={{ marginBottom: 24 }}>
-              <EditalTable editais={editais.filter(ed => {
-                if (!searchText.trim()) return true;
-                const s = searchText.toLowerCase();
-                return (ed.orgao_nome || "").toLowerCase().includes(s)
-                  || (ed.objeto || "").toLowerCase().includes(s)
-                  || (ed.empresa_sugerida || "").toLowerCase().includes(s)
-                  || (ed.uf || "").toLowerCase().includes(s);
-              })} onSelect={setSelectedPncpId} onRefresh={loadEditais} dark />
-            </div>
-          </>
-        )}
+        {tab === "pipeline" && <PipelinePage />}
 
         {tab === "buscar" && (
           <PncpSearch onImported={() => { loadEditais(); setTab("pipeline"); }} />
@@ -166,6 +131,14 @@ function Dashboard({ onLogout }) {
 
         {tab === "pregoes" && (
           <PregaoPanel editais={editais} />
+        )}
+
+        {tab === "planilhas" && (
+          <PlanilhaPanel />
+        )}
+
+        {tab === "habilitacao" && (
+          <HabilitacaoPage />
         )}
 
         {tab === "concorrentes" && (

@@ -241,13 +241,70 @@ def inserir_edital_manual(body: EditalManual):
     return {"ok": True, "pncp_id": pncp_id, "status": "inserido"}
 
 
+@router.post("/batch/gerar-planilhas")
+def gerar_planilhas_batch():
+    """Gera planilhas para todos os editais abertos SEM gastar API.
+
+    Usa MDO padrão + CCT + salário mínimo como fonte de dados.
+    Não faz nenhuma chamada LLM.
+    """
+    import threading, logging
+    log = logging.getLogger("rota_planilha_batch")
+
+    conn = get_connection()
+    # Busca editais abertos que ainda não têm planilha
+    rows = conn.execute(
+        """SELECT pncp_id, objeto, valor_estimado, status FROM editais
+           WHERE (planilha_path IS NULL OR planilha_path = '')
+           AND status NOT IN ('arquivado', 'pregao_ext', 'precificando')
+           AND (fonte IS NULL OR fonte != 'extension')
+           ORDER BY valor_estimado DESC"""
+    ).fetchall()
+
+    pncp_ids = [r["pncp_id"] for r in rows]
+    total = len(pncp_ids)
+
+    if total == 0:
+        return {"ok": True, "total": 0, "msg": "Todos os editais já têm planilha."}
+
+    def _run_batch():
+        import sys
+        sys.path.insert(0, str(Path(__file__).parent.parent.parent))
+        from agente3_precificador.main import precificar_edital
+        from shared.database import atualizar_status_edital
+
+        sucesso = 0
+        erro = 0
+        for pid in pncp_ids:
+            try:
+                log.info(f"[BATCH sem_api] Gerando planilha: {pid}")
+                resultado = precificar_edital(pid, sem_api=True)
+                if resultado:
+                    sucesso += 1
+                else:
+                    erro += 1
+            except Exception as e:
+                log.error(f"[BATCH] Erro {pid}: {e}")
+                erro += 1
+                try:
+                    atualizar_status_edital(pid, "erro_precificacao", motivo_nogo=str(e))
+                except Exception:
+                    pass
+
+        log.info(f"[BATCH] Concluído: {sucesso}/{total} OK, {erro} erros")
+
+    threading.Thread(target=_run_batch, daemon=True).start()
+    return {"ok": True, "total": total, "pncp_ids": pncp_ids, "msg": f"Gerando {total} planilhas sem API (em background)..."}
+
+
 @router.get("")
 def listar_editais(
     status: list[str] = Query(None),
     page: int = Query(1, ge=1),
-    per_page: int = Query(20, ge=1, le=100),
+    per_page: int = Query(20, ge=1, le=500),
     sort: str = Query("-score_relevancia"),
     busca: str = Query(None),
+    abertas: bool = Query(False),
 ):
     conn = get_connection()
     where = []
@@ -256,6 +313,16 @@ def listar_editais(
     # Exclui editais da extensão do pipeline (vão para Pregões)
     where.append("(fonte IS NULL OR fonte != 'extension')")
     where.append("status != 'pregao_ext'")
+
+    # Exclui editais vencidos por padrão (data_encerramento < agora)
+    from datetime import datetime
+    agora_iso = datetime.now().isoformat()
+    where.append("(data_encerramento IS NULL OR data_encerramento > ?)")
+    params.append(agora_iso)
+
+    if abertas:
+        where.append("data_encerramento > ?")
+        params.append(agora_iso)
 
     if status:
         placeholders = ",".join(["?"] * len(status))
@@ -504,6 +571,92 @@ def download_planilha(pncp_id: str):
 
     return FileResponse(str(path), filename=path.name,
                         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+
+
+@router.post("/{pncp_id:path}/planilha/calibrar")
+def calibrar_planilha(pncp_id: str, body: dict):
+    """Gera planilha calibrada para fechar EXATO em um valor-alvo definido pelo usuário.
+
+    Body: {"valor_alvo": 503900.00}
+    """
+    import sys, threading, logging
+    sys.path.insert(0, str(Path(__file__).parent.parent.parent))
+
+    valor_alvo = body.get("valor_alvo")
+    if not valor_alvo or valor_alvo <= 0:
+        raise HTTPException(400, "Informe valor_alvo > 0")
+
+    log = logging.getLogger("calibrar")
+
+    def _run():
+        from agente3_precificador.main import precificar_edital
+        try:
+            precificar_edital(pncp_id, sem_api=True, valor_alvo=float(valor_alvo))
+        except Exception as e:
+            log.error(f"Erro calibrando {pncp_id}: {e}")
+
+    threading.Thread(target=_run, daemon=True).start()
+    return {"ok": True, "msg": f"Calibrando planilha para R$ {valor_alvo:,.2f}", "pncp_id": pncp_id}
+
+
+@router.get("/{pncp_id:path}/planilha/entrega")
+def gerar_planilha_entrega(pncp_id: str):
+    """Gera versão 'limpa' da planilha (sem break-even) para entrega ao órgão.
+
+    Não persiste — gera on-demand e retorna download direto.
+    """
+    import sys, logging
+    sys.path.insert(0, str(Path(__file__).parent.parent.parent))
+    from config.settings import PLANILHAS_DIR
+    from agente3_precificador.main import precificar_edital
+
+    log = logging.getLogger("planilha_entrega")
+
+    try:
+        # Roda o precificador completo, mas salva em path diferente
+        resultado = precificar_edital(pncp_id, sem_api=True)
+        if not resultado:
+            raise HTTPException(500, "Não foi possível gerar a planilha")
+
+        # A planilha gerada tem break-even. Precisamos regenerar sem.
+        # Chama o builder direto com incluir_breakeven=False
+        from agente3_precificador.planilha_builder import gerar_planilha as build
+        from shared.database import get_edital
+        import json as _json
+
+        edital = get_edital(pncp_id)
+        if not edital:
+            raise HTTPException(404, "Edital não encontrado")
+
+        # Lê a planilha completa pra extrair os cargos já calculados
+        # Alternativa: reexecuta internals. Vou usar abordagem mais simples:
+        # reexecuta o precificador inteiro mas com output diferente.
+        # Por enquanto, carrega planilha existente e remove aba BREAK-EVEN
+
+        import openpyxl
+        planilha_completa = Path(edital["planilha_path"]) if edital.get("planilha_path") else None
+        if not planilha_completa or not planilha_completa.exists():
+            raise HTTPException(404, "Planilha não gerada. Gere a planilha primeiro.")
+
+        PLANILHAS_DIR.mkdir(parents=True, exist_ok=True)
+        safe_id = pncp_id.replace("/", "_").replace("-", "_")
+        entrega_path = PLANILHAS_DIR / f"ENTREGA_{safe_id}.xlsx"
+
+        wb = openpyxl.load_workbook(str(planilha_completa))
+        if "BREAK-EVEN" in wb.sheetnames:
+            wb.remove(wb["BREAK-EVEN"])
+        wb.save(str(entrega_path))
+        log.info(f"Planilha de entrega gerada: {entrega_path}")
+
+        return FileResponse(
+            str(entrega_path),
+            filename=f"proposta_{pncp_id}.xlsx",
+            media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(500, f"Erro: {str(e)}")
 
 
 @router.post("/{pncp_id:path}/planilha/upload")

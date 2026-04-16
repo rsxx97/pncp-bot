@@ -9,18 +9,60 @@ log = logging.getLogger("template_filler")
 
 
 def detectar_template(editais_dir: Path, pncp_id: str) -> Path | None:
-    """Detecta se existe planilha-template do orgao nos arquivos baixados."""
+    """Detecta template .xlsx/.xls preenchivel nos arquivos do edital."""
+    info = detectar_template_info(editais_dir, pncp_id)
+    if info and info["fillable"]:
+        return info["path"]
+    return None
+
+
+def detectar_template_info(editais_dir: Path, pncp_id: str) -> dict | None:
+    """Detecta qualquer planilha/modelo de proposta fornecido pelo edital.
+
+    Retorna dict {path, ext, fillable, motivo} ou None se nada encontrado.
+    fillable=True apenas para .xlsx/.xls (openpyxl); outros formatos exigem preenchimento manual.
+    """
     import glob
+    keywords = [
+        "planilha", "mao_de_obra", "mao de obra", "mdo", "modelo",
+        "custos", "formacao", "proposta", "anexo_iii", "anexo iii",
+        "anexo_v", "anexo v", "precos",
+    ]
+    candidatos = []
     pattern = str(editais_dir / f"{pncp_id}*")
     for fpath in sorted(glob.glob(pattern)):
         fp = Path(fpath)
-        if fp.suffix.lower() in (".xlsx", ".xls"):
-            fname = fp.name.lower()
-            keywords = ["planilha", "mao_de_obra", "mao de obra", "modelo", "custos", "formacao"]
-            if any(k in fname for k in keywords):
-                log.info(f"Template encontrado: {fp.name}")
-                return fp
-    return None
+        ext = fp.suffix.lower()
+        if ext not in (".xlsx", ".xls", ".ods", ".doc", ".docx", ".pdf"):
+            continue
+        fname = fp.name.lower()
+        if not any(k in fname for k in keywords):
+            continue
+        candidatos.append((fp, ext))
+
+    if not candidatos:
+        return None
+
+    # Prioriza .xlsx > .xls > .ods > .docx > .doc > .pdf
+    ordem = {".xlsx": 0, ".xls": 1, ".ods": 2, ".docx": 3, ".doc": 4, ".pdf": 5}
+    candidatos.sort(key=lambda x: ordem.get(x[1], 9))
+    fp, ext = candidatos[0]
+
+    if ext in (".xlsx", ".xls"):
+        fillable = True
+        motivo = "xlsx preenchivel"
+    elif ext == ".ods":
+        fillable = False
+        motivo = "ODS — abra no LibreOffice e preencha manualmente (ou converta para XLSX)"
+    elif ext in (".doc", ".docx"):
+        fillable = False
+        motivo = "DOC — preencher manualmente no Word/LibreOffice"
+    else:
+        fillable = False
+        motivo = "PDF — preencher manualmente (formulário impresso)"
+
+    log.info(f"Template do edital detectado: {fp.name} [{motivo}]")
+    return {"path": fp, "ext": ext, "fillable": fillable, "motivo": motivo}
 
 
 def preencher_template(

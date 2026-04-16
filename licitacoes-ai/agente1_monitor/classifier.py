@@ -5,7 +5,7 @@ import logging
 import sys
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
-from config.settings import KEYWORDS_INTERESSE, KEYWORDS_EXCLUSAO, SCORE_MINIMO
+from config.settings import KEYWORDS_INTERESSE, KEYWORDS_EXCLUSAO, SCORE_MINIMO, KEYWORDS_POR_UF
 from shared.models import EditalResumo, ClassificacaoEdital
 from shared.utils import contem_palavra_chave, contem_exclusao, derivar_esfera, formatar_valor
 
@@ -14,18 +14,31 @@ log = logging.getLogger("classifier")
 # ── Classificação rápida por keywords (sem LLM) ───────────────────────
 
 def pre_filtro(edital: EditalResumo) -> bool:
-    """Filtro rápido por keywords. Retorna True se o edital passa."""
-    objeto = edital.objeto or ""
+    """Filtro rápido por keywords. Retorna True se o edital passa.
 
-    # Exclui se contém palavras de exclusão
+    Aceita se:
+    1. Nicho detectado != "outros" (residuos, obra, seguranca, admin, mdo_limpeza), OU
+    2. Match em KEYWORDS_INTERESSE genérico.
+    Rejeita se contém KEYWORDS_EXCLUSAO ou tem keywords específicas da UF sem match.
+    """
+    from shared.nichos import detectar_nicho
+
+    objeto = (edital.objeto or "").lower()
+
     if contem_exclusao(objeto):
         return False
 
-    # Aceita se contém palavras de interesse
-    if contem_palavra_chave(objeto):
+    # Nicho reconhecido = aceita direto
+    nicho = detectar_nicho(objeto)
+    if nicho != "outros":
         return True
 
-    return False
+    # UF com lista dedicada
+    kws_uf = KEYWORDS_POR_UF.get((edital.uf or "").upper())
+    if kws_uf:
+        return any(k in objeto for k in kws_uf)
+
+    return contem_palavra_chave(objeto)
 
 
 def score_rapido(edital: EditalResumo) -> int:

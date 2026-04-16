@@ -763,6 +763,7 @@ def gerar_planilha(
     empresa_info: dict,
     licitacao_info: dict,
     output_path: str | Path,
+    incluir_breakeven: bool = True,
 ) -> Path:
     """Gera planilha IN 05/2017 completa com fórmulas Excel dinâmicas.
 
@@ -824,10 +825,14 @@ def gerar_planilha(
     ws_resumo = wb.create_sheet(title="RESUMO")
     _build_resumo_sheet(ws_resumo, postos, sheet_names, empresa_info, licitacao_info)
 
-    # 3. Aba BREAK-EVEN
-    ws_be = wb.create_sheet(title="BREAK-EVEN")
-    _build_breakeven_sheet(ws_be, postos, sheet_names, empresa_info, licitacao_info)
+    # 3. Aba BREAK-EVEN (opcional — omitida em planilhas para entrega ao órgão)
+    total_abas = len(sheet_names) + 1
+    if incluir_breakeven:
+        ws_be = wb.create_sheet(title="BREAK-EVEN")
+        _build_breakeven_sheet(ws_be, postos, sheet_names, empresa_info, licitacao_info)
+        total_abas += 1
 
     wb.save(str(output_path))
-    log.info(f"Planilha gerada: {output_path} ({len(postos)} postos, {len(sheet_names)+2} abas)")
+    log.info(f"Planilha gerada: {output_path} ({len(postos)} postos, {total_abas} abas, "
+             f"{'com' if incluir_breakeven else 'SEM'} break-even)")
     return output_path

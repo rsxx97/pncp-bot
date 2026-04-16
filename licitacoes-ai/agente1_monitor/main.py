@@ -6,7 +6,7 @@ from datetime import datetime
 import sys
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
-from config.settings import SCORE_MINIMO, ESTADO_FOCO
+from config.settings import SCORE_MINIMO, ESTADO_FOCO, UFS_FOCO
 from shared.database import (
     init_db, get_db, upsert_edital, get_edital,
     set_monitor_state, registrar_execucao
@@ -69,20 +69,26 @@ def executar_monitor(
     }
 
     if modalidades is None:
-        modalidades = [4, 5, 6, 7]
+        # 4=Concorrência Eletrônica, 5=Concorrência, 6=Pregão Eletrônico, 7=Pregão Presencial,
+        # 8=Dispensa de Licitação, 9=Inexigibilidade
+        modalidades = [4, 5, 6, 7, 8, 9]
 
-    # 1. Busca local (estado foco)
-    log.info(f"Buscando editais {ESTADO_FOCO} (últimos {dias_retroativos} dias)...")
-    try:
-        editais_local = buscar_editais(
-            modalidades=modalidades,
-            dias_retroativos=dias_retroativos,
-        )
-        stats["total_api"] += len(editais_local)
-    except Exception as e:
-        log.error(f"Erro na busca local: {e}")
-        editais_local = []
-        stats["erros"] += 1
+    # 1. Busca local — itera todas as UFs focadas (ex: RJ + SC)
+    editais_local = []
+    log.info(f"Buscando editais UFs={UFS_FOCO} (últimos {dias_retroativos} dias)...")
+    for uf in UFS_FOCO:
+        try:
+            parciais = buscar_editais(
+                modalidades=modalidades,
+                uf=uf,
+                dias_retroativos=dias_retroativos,
+            )
+            editais_local.extend(parciais)
+            stats["total_api"] += len(parciais)
+            log.info(f"  {uf}: {len(parciais)} editais")
+        except Exception as e:
+            log.error(f"Erro na busca {uf}: {e}")
+            stats["erros"] += 1
 
     # 2. Busca nacional (opcional)
     editais_nacional = []
@@ -122,7 +128,7 @@ def executar_monitor(
         stats["novos"] += 1
 
         # Pre-filtro por keywords (nacional já veio filtrado)
-        if edital.uf == ESTADO_FOCO and not pre_filtro(edital):
+        if edital.uf in UFS_FOCO and not pre_filtro(edital):
             # Salva como arquivado (não relevante)
             db_dict = edital_to_db_dict(edital, score=0, status="arquivado")
             upsert_edital(db_dict)
