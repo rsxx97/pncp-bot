@@ -11,6 +11,18 @@ config.json
 
 # Cache
 enviados.json
+**/data/*_sent.json
+**/data/backups/
+**/data/*.lock
+**/data/telegram_offset*.json
+
+# Logs
+logs/
+*.log
+
+# Env
+.env
+licitacoes-ai/.env
 
 # IDE
 .vscode/

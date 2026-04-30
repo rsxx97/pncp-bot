@@ -1,0 +1,55 @@
+name: Bot Obra (Construção/Manutenção SC+RJ)
+
+on:
+  schedule:
+    - cron: '0 10-23/2 * * 1-5'  # A cada 2h, 10-22 UTC (07-19 Brasília), seg-sex
+  workflow_dispatch:  # permite rodar manualmente
+
+concurrency:
+  group: bot-obra
+  cancel-in-progress: false  # não cancela runs anteriores — espera terminar
+
+jobs:
+  run-bot:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: pip install httpx python-dotenv
+
+      - name: Download cache anterior (obra_sent.json)
+        uses: dawidd6/action-download-artifact@v6
+        with:
+          name: bot-obra-cache
+          path: empresas/_compartilhado/data/
+          if_no_artifact_found: warn
+          workflow_conclusion: ''
+        continue-on-error: true
+
+      - name: Criar .env com secrets
+        run: |
+          mkdir -p licitacoes-ai
+          cat > licitacoes-ai/.env <<EOF
+          TELEGRAM_BOT_TOKEN_OBRA=${{ secrets.TELEGRAM_BOT_TOKEN_OBRA }}
+          TELEGRAM_CHAT_OBRA=${{ secrets.TELEGRAM_CHAT_OBRA }}
+          EOF
+
+      - name: Executar bot obra
+        run: python core/skills/bot_obra.py
+
+      - name: Upload cache (obra_sent.json)
+        if: always()  # upload mesmo se job falhar
+        uses: actions/upload-artifact@v4
+        with:
+          name: bot-obra-cache
+          path: empresas/_compartilhado/data/obra_sent.json
+          overwrite: true
+          retention-days: 90

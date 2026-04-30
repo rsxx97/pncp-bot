@@ -1,0 +1,55 @@
+name: Bot Aquisição TI/Eletrônicos (RJ)
+
+on:
+  schedule:
+    - cron: '15 10-23/2 * * 1-5'  # A cada 2h, 10-22 UTC (07-19 Brasília), seg-sex (15min de offset do bot_obra)
+  workflow_dispatch:
+
+concurrency:
+  group: bot-aquisicao-ti
+  cancel-in-progress: false
+
+jobs:
+  run-bot:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: pip install httpx python-dotenv
+
+      - name: Download cache anterior (aquisicao_ti_sent.json)
+        uses: dawidd6/action-download-artifact@v6
+        with:
+          name: bot-aquisicao-ti-cache
+          path: empresas/_compartilhado/data/
+          if_no_artifact_found: warn
+          workflow_conclusion: ''
+        continue-on-error: true
+
+      - name: Criar .env com secrets
+        run: |
+          mkdir -p licitacoes-ai
+          cat > licitacoes-ai/.env <<EOF
+          TELEGRAM_BOT_TOKEN_AQUISICAO_TI=${{ secrets.TELEGRAM_BOT_TOKEN_AQUISICAO_TI }}
+          TELEGRAM_CHAT_AQUISICAO_TI=${{ secrets.TELEGRAM_CHAT_AQUISICAO_TI }}
+          EOF
+
+      - name: Executar bot aquisição TI
+        run: python core/skills/bot_aquisicao_ti.py
+
+      - name: Upload cache (aquisicao_ti_sent.json)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: bot-aquisicao-ti-cache
+          path: empresas/_compartilhado/data/aquisicao_ti_sent.json
+          overwrite: true
+          retention-days: 90
