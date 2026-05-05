@@ -85,7 +85,7 @@ EXCLUSOES_OBRA = [
     "tecnologia da informação", "tecnologia da informacao", "ti corporativ",
     "outsourcing de impressão", "outsourcing de impressao",
     "active directory", "office 365", "microsoft 365",
-    # Telecom / Internet
+    # Telecom / Internet / Rede de TI
     "serviço de internet", "servico de internet",
     "link dedicado", "link de dados",
     "gpon", "wi-fi", "wifi",
@@ -93,6 +93,13 @@ EXCLUSOES_OBRA = [
     "telecomunicações", "telecomunicacoes",
     "internet por meio", "acesso à internet", "acesso a internet",
     "fibra óptica", "fibra optica",  # quando é serviço, não infraestrutura
+    "infraestrutura de rede", "infra de rede",
+    "rede de dados", "rede lógica", "rede logica",
+    "cabeamento estruturado", "cabeamento de dados",
+    "rede entre prédios", "rede entre predios",
+    "material de rede", "materiais de rede",
+    "switch", "roteador", "patch panel",
+    "rack de servidor", "rack de rede",
     # Aquisição pura de material (sem execução de obra)
     "aquisição de material de construção", "aquisicao de material de construcao",
     "aquisição de materiais de construção", "aquisicao de materiais de construcao",
