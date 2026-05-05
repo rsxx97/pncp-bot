@@ -1,0 +1,55 @@
+name: Bot Terceirização MDO (RJ+SC+PR)
+
+on:
+  schedule:
+    - cron: '30 10-23/2 * * 1-5'  # A cada 2h, 10-22 UTC (07-19 Brasília), seg-sex (offset 30min)
+  workflow_dispatch:
+
+concurrency:
+  group: bot-terceirizacao-mdo
+  cancel-in-progress: false
+
+jobs:
+  run-bot:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: pip install httpx python-dotenv
+
+      - name: Download cache anterior (terceirizacao_mdo_sent.json)
+        uses: dawidd6/action-download-artifact@v6
+        with:
+          name: bot-terceirizacao-mdo-cache
+          path: empresas/_compartilhado/data/
+          if_no_artifact_found: warn
+          workflow_conclusion: ''
+        continue-on-error: true
+
+      - name: Criar .env com secrets
+        run: |
+          mkdir -p licitacoes-ai
+          cat > licitacoes-ai/.env <<EOF
+          TELEGRAM_BOT_TOKEN_MDO=${{ secrets.TELEGRAM_BOT_TOKEN_MDO }}
+          TELEGRAM_CHAT_MDO=${{ secrets.TELEGRAM_CHAT_MDO }}
+          EOF
+
+      - name: Executar bot terceirização MDO
+        run: python core/skills/bot_terceirizacao_mdo.py
+
+      - name: Upload cache
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: bot-terceirizacao-mdo-cache
+          path: empresas/_compartilhado/data/terceirizacao_mdo_sent.json
+          overwrite: true
+          retention-days: 90

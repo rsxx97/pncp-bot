@@ -101,6 +101,15 @@ EXCLUSOES_OBRA = [
     "manutenção de equipamento médico", "manutencao de equipamento medico",
     "manutenção odontológic", "manutencao odontologic",
     "manutenção de balança", "manutencao de balanca",
+    # Pavimentação / contenção / encostas (não é obra/reforma predial)
+    "pavimentação", "pavimentacao",
+    "recapeamento", "recape asfáltico", "recape asfaltico",
+    "contenção de muro", "contencao de muro",
+    "muro de contenção", "muro de contencao",
+    "contenção de encosta", "contencao de encosta",
+    "estabilização de encosta", "estabilizacao de encosta",
+    "encosta",
+    "talude",
 ]
 
 
@@ -115,10 +124,10 @@ def _eh_falso_obra(objeto: str) -> bool:
 KEYWORDS_OBRA_REGEX = [
     r"\bobras?\b", r"\breforma\w*", r"\bconstru[çc][ãa]o\b", r"\bconstruir\b",
     r"\bamplia[çc][ãa]o\b", r"\bedifica[çc][ãa]o\b", r"\bedif[íi]cios?\b",
-    r"\bpavimenta[çc][ãa]o\b", r"\bdrenagem\b",
+    r"\bdrenagem\b",
     r"\burbaniza[çc][ãa]o\b", r"\bimpermeabiliza[çc][ãa]o\b",
     r"\bengenharia\s+civil\b", r"\binfraestrutura\b",
-    r"\baterro\b", r"\bmuro\b", r"\btalude\b", r"\bcortina\s+atirantada\b",
+    r"\baterro\b",
     r"\brevitaliza[çc][ãa]o\b", r"\brecupera[çc][ãa]o\s+de\s+(obra|pista|via|vias)",
     r"\bpredial\b", r"\bpr[eé]dios?\b",
     r"\bunidades?\s+habitacion", r"\bhabitacional\b",
@@ -345,7 +354,7 @@ def enviar_telegram_com_pdf(caption: str, pncp_id: str) -> bool:
 KEYWORDS_BUSCA_PNCP = [
     "obra", "reforma", "construção",
     "manutenção predial", "manutenção preventiva", "manutenção corretiva",
-    "ampliação", "edificação", "pavimentação",
+    "ampliação", "edificação",
     "engenharia civil", "infraestrutura", "elevador",
     "ar condicionado", "climatização", "drenagem",
 ]
