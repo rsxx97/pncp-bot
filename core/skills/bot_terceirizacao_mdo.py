@@ -32,6 +32,8 @@ from dotenv import load_dotenv
 load_dotenv(LICITACOES_AI / ".env", override=True)
 
 from shared.nichos import formatar_edital
+sys.path.insert(0, str(Path(__file__).parent.parent.parent))
+from core.skills._db_helper import gravar_edital
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s | %(levelname)s | %(message)s")
 log = logging.getLogger("bot_terceirizacao_mdo")
@@ -572,6 +574,7 @@ def executar(dry_run: bool = False, bootstrap: bool = False) -> dict:
             if enviar_telegram_com_pdf(msg, pncp_id):
                 sent.add(pncp_id)
                 stats["enviados"] += 1
+                gravar_edital(ed, nicho="terceirizacao_mdo", enviado=True)
                 log.info(f"Enviado {ed['uf']}: {pncp_id} ({stats['enviados']} no total)")
                 if stats["enviados"] % SAVE_INCREMENTAL_A_CADA == 0:
                     _save_sent(sent)
