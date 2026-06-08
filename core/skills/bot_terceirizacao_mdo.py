@@ -1,4 +1,4 @@
-"""Bot Terceirização MDO — radar PNCP RJ.
+"""Bot Terceirização MDO — radar PNCP (RJ qualquer valor + outras UFs >= R$ 1 mi).
 
 Nicho: terceirização de mão de obra continuada (limpeza, copeiragem, ASG,
 recepção, portaria, motorista, jardinagem, brigada não-armada, etc).
@@ -45,7 +45,9 @@ SENT_FILE.parent.mkdir(parents=True, exist_ok=True)
 BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN_MDO") or os.getenv("TELEGRAM_BOT_TOKEN_OBRA") or os.getenv("TELEGRAM_BOT_TOKEN")
 CHAT_ID = os.getenv("TELEGRAM_CHAT_MDO") or os.getenv("TELEGRAM_CHAT_ID")
 
-# Brasil inteiro — todas as 27 UFs com mesmo piso de valor mínimo
+# Territorial híbrido (regra 2026-06-08):
+#   • RJ → qualquer valor, inclusive orçamento sigiloso (mercado local da Manutec).
+#   • Outras UFs → grandes contratos (>= R$ 1 mi) OU orçamento sigiloso (liberado).
 UFS_MDO = [
     "AC", "AL", "AM", "AP", "BA", "CE", "DF", "ES", "GO", "MA", "MG",
     "MS", "MT", "PA", "PB", "PE", "PI", "PR", "RJ", "RN", "RO", "RR",
@@ -53,9 +55,9 @@ UFS_MDO = [
 ]
 # Manutec tem atestado — sem limite máximo (filtro ME/EPP não se aplica)
 VALOR_MAXIMO = float("inf")
-# Piso uniforme para todo o BR — descarta editais com valor estimado < VALOR_MINIMO.
-# Editais com valor sigiloso também são descartados (não há como aferir o piso).
-VALOR_MINIMO = 10_000_000.0
+# Piso por território: RJ liberado; demais UFs só acima de R$ 1 milhão.
+VALOR_MINIMO_RJ = 0.0
+VALOR_MINIMO_OUTRAS = 1_000_000.0
 
 # Keywords PNCP — terceirização de MDO continuada
 KEYWORDS_BUSCA_PNCP = [
@@ -74,15 +76,23 @@ KEYWORDS_BUSCA_PNCP = [
     "porteiro", "portaria",
     "serviços gerais", "servicos gerais",
     "fornecimento de mão de obra", "fornecimento de mao de obra",
+    # Central de atendimento / call center (MDO em telesserviços)
+    "central de atendimento", "central de relacionamento",
+    "call center", "teleatendimento", "telemarketing",
+    "atendimento receptivo", "atendimento ativo",
 ]
 
-# MDO: só licitação tradicional. Dispensa removida (cliente já tem atestado, não precisa pegar contratação direta).
+# MDO: licitação tradicional + dispensa (RJ). Dispensa reativada — Manutec também pega
+# contratação direta no RJ (o atestado já garante; vira oportunidade extra).
 MODALIDADES_ACEITAS = (
     "Pregão Eletrônico", "Pregão Presencial",
     "Concorrência", "Concorrência - Loss",
     "Tomada de Preços", "Convite",
+    "Dispensa", "Dispensa de Licitação", "Dispensa de Licitacao",
 )
-MODALIDADES_CONTRATACAO_DIRETA = ()  # vazio — não há aviso de contratação direta neste nicho
+MODALIDADES_CONTRATACAO_DIRETA = (
+    "Dispensa", "Dispensa de Licitação", "Dispensa de Licitacao",
+)
 
 # Exclusões — nichos já cobertos por outros bots, falsos positivos
 EXCLUSOES_MDO = [
@@ -251,6 +261,9 @@ FUNCOES_TERCEIRIZAVEIS = [
     r"\bdedetiza\w+", r"\bdesratiza\w+",
     r"\bcontrol\w*\s+de\s+acesso\b",
     r"\bapoio\s+administrativo\b", r"\bapoio\s+operacional\b",
+    r"\batend\w+\b", r"\boperador(es|as)?\s+de\s+(call|telemarketing|teleatend|atend)",
+    r"\bteleatend\w*", r"\btelemarket\w*",
+    r"\bcentral\s+de\s+(atendimento|relacionamento)\b",
 ]
 
 
@@ -509,9 +522,9 @@ def executar(dry_run: bool = False, bootstrap: bool = False) -> dict:
 
     try:
         sent = _load_sent()
-        log.info("Consultando PNCP search (Terceirização MDO, RJ)...")
+        log.info("Consultando PNCP search (Terceirização MDO — RJ + outras UFs >= R$ 1 mi)...")
         editais = _buscar_editais_pncp_live()
-        log.info(f"PNCP retornou {len(editais)} editais únicos abertos em RJ")
+        log.info(f"PNCP retornou {len(editais)} editais únicos abertos (27 UFs)")
 
         candidatos = []
         for ed in editais:
@@ -533,17 +546,17 @@ def executar(dry_run: bool = False, bootstrap: bool = False) -> dict:
                        for m in MODALIDADES_ACEITAS):
                 stats["modalidade_invalida"] += 1
                 continue
-            # Filtro uniforme de valor: todo o BR precisa ter valor estimado >= VALOR_MINIMO
+            # Enriquece p/ datas/objeto/modalidade/valor no card.
             _enriquecer_edital(ed)
-            if ed.get("valor_sigiloso"):
-                stats.setdefault("valor_sigiloso", 0)
-                stats["valor_sigiloso"] += 1
-                continue
-            valor = ed.get("valor_estimado") or 0
-            if valor < VALOR_MINIMO:
-                stats.setdefault("abaixo_minimo", 0)
-                stats["abaixo_minimo"] += 1
-                continue
+            # Filtro de valor por território:
+            #   RJ → qualquer valor (incl. sigiloso).
+            #   Outras UFs → piso R$ 1 mi p/ valor conhecido; sigiloso passa liberado.
+            if (ed.get("uf") or "").upper() != "RJ" and not ed.get("valor_sigiloso"):
+                valor = ed.get("valor_estimado") or 0
+                if valor < VALOR_MINIMO_OUTRAS:
+                    stats.setdefault("abaixo_minimo_outras_uf", 0)
+                    stats["abaixo_minimo_outras_uf"] += 1
+                    continue
             candidatos.append(ed)
 
         stats["encontrados"] = len(candidatos)

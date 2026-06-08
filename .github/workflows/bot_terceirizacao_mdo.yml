@@ -1,4 +1,4 @@
-name: Bot Terceirização MDO (RJ+SC+PR)
+name: Bot Terceirização MDO (RJ + outras UFs >= R$ 1 mi)
 
 on:
   schedule:
