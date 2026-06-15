@@ -21,3 +21,29 @@ Thumbs.db
 bot.lock
 server_lan.log
 *.log
+
+# Segredos (caminho relativo a este .gitignore)
+config/google_sa.json
+config/*_sa.json
+
+# Backups e scripts de debug (nunca commitar)
+_backup_pre_deploy/
+_check*.py
+_force_tick.py
+
+# Downloads de editais / propostas (binarios pesados, nao sao codigo)
+bot_pncp_skills/
+data/editais/*.doc
+data/editais/*.docx
+data/editais/*.ods
+data/editais/*.odt
+data/editais/*.xls
+data/editais/*.xlsx
+data/editais/*.assinado
+data/editais/*.proposta
+data/ccts/
+data/habilitacao/
+data/screenshots/
+data/skills/
+data/keeping_export.txt
+gerar_planilha_*.py

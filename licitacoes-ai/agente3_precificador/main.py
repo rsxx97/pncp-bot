@@ -5,13 +5,15 @@ from pathlib import Path
 
 import sys
 sys.path.insert(0, str(Path(__file__).parent.parent))
+# Adiciona raiz do projeto para importar core/
+sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 from config.settings import DATA_DIR
 from shared.database import (
     get_edital, get_editais_pendentes, atualizar_status_edital,
     adicionar_comentario, init_db,
 )
-from shared.llm_client import ask_claude_json
+# LLM removido — código puro (regex + banco + motor_matematico)
 from agente3_precificador.cct_manager import (
     get_piso_salarial, get_beneficios, importar_ccts_diretorio,
 )
@@ -23,9 +25,6 @@ from agente3_precificador.template_filler import (
     detectar_template_info, preencher_template, pode_usar_template,
 )
 from agente3_precificador.planilha_classifier import classificar_planilha
-from agente3_precificador.prompts import (
-    SYSTEM_EXTRAIR_POSTOS, PROMPT_EXTRAIR_POSTOS,
-)
 
 def _load_empresa_perfil() -> list[dict]:
     """Carrega perfil das empresas do grupo."""
@@ -285,43 +284,56 @@ PLANILHAS_DIR = DATA_DIR / "planilhas"
 
 
 def _extrair_postos_llm(edital: dict, analise: dict) -> dict:
-    """Usa Claude para extrair postos e parâmetros do edital analisado."""
-    postos_analise = analise.get("postos", [])
-    postos_texto = ""
-    if postos_analise:
-        for p in postos_analise:
-            if isinstance(p, dict):
-                postos_texto += f"- {p.get('funcao', '?')}: {p.get('quantidade', 1)} postos, jornada {p.get('jornada', '44h')}\n"
-            else:
-                postos_texto += f"- {p}\n"
-    else:
-        postos_texto = "Não identificados na análise prévia."
+    """Estrutura postos a partir da analise ja feita pelo agente2 (codigo puro, zero API).
 
-    requisitos = analise.get("requisitos_habilitacao", [])
-    requisitos_texto = "\n".join(f"- {r}" for r in requisitos) if requisitos else "Não especificados."
+    O agente2 (edital_parser com regex) ja extraiu postos_trabalho.
+    Aqui so reformatamos pro formato esperado pelo precificador.
+    """
+    postos_analise = analise.get("postos_trabalho") or analise.get("postos", [])
+    postos_estruturados = []
 
-    prompt = PROMPT_EXTRAIR_POSTOS.format(
-        objeto=edital.get("objeto", ""),
-        valor_estimado=f"{edital.get('valor_estimado', 0):,.2f}",
-        municipio=edital.get("municipio", "Rio de Janeiro"),
-        uf=edital.get("uf", "RJ"),
-        empresa_sugerida=edital.get("empresa_sugerida", "manutec"),
-        prazo_meses=analise.get("prazo_contrato_meses", 12) or 12,
-        postos_texto=postos_texto,
-        requisitos_texto=requisitos_texto,
-        regime_contratacao=analise.get("regime_contratacao", ""),
-        cct_aplicavel=analise.get("cct_aplicavel", ""),
-        local_prestacao=analise.get("local_prestacao", ""),
-        observacoes="",
+    for p in postos_analise:
+        if isinstance(p, dict):
+            postos_estruturados.append({
+                "funcao": p.get("funcao", "?"),
+                "quantidade": int(p.get("quantidade", 1)),
+                "jornada": p.get("jornada", "44h"),
+                "descricao": p.get("descricao", p.get("funcao", "?")),
+            })
+        else:
+            # string simples
+            postos_estruturados.append({
+                "funcao": str(p),
+                "quantidade": 1,
+                "jornada": "44h",
+                "descricao": str(p),
+            })
+
+    cct = analise.get("cct", {})
+    sindicato = (
+        cct.get("sindicato_laboral")
+        or cct.get("sindicato_patronal")
+        or analise.get("cct_aplicavel", "")
     )
 
-    return ask_claude_json(
-        system=SYSTEM_EXTRAIR_POSTOS,
-        user=prompt,
-        max_tokens=3000,
-        agente="precificador",
-        pncp_id=edital.get("pncp_id"),
-    )
+    # Formato esperado downstream
+    return {
+        "_metodo": "codigo_puro",
+        "postos": postos_estruturados,
+        "cct": {
+            "sindicato_laboral": sindicato,
+            "sindicato_patronal": cct.get("sindicato_patronal"),
+            "vigencia": cct.get("vigencia"),
+            "piso_salarial": cct.get("piso_salarial"),
+        },
+        "prazo_meses": analise.get("prazo_meses") or analise.get("prazo_contrato_meses", 12) or 12,
+        "regime_contratacao": analise.get("regime_contratacao", ""),
+        "local_prestacao": analise.get("local_prestacao", edital.get("municipio", "Rio de Janeiro")),
+        "uf": edital.get("uf", "RJ"),
+        "requisitos_habilitacao": analise.get("habilitacao_documentos", []),
+        "garantias": analise.get("garantias", {}),
+        "requisitos_tecnicos": analise.get("requisitos_tecnicos", {}),
+    }
 
 
 def _normalizar_texto(t: str) -> str:
@@ -421,24 +433,79 @@ def _resolver_salario(funcao: str, salario_edital: float | None,
 
 
 def _estimar_piso_llm(funcao: str, sindicato: str, uf: str) -> float | None:
-    """Usa LLM para estimar piso salarial baseado na CCT identificada."""
-    prompt = f"""Qual o piso salarial aproximado para a função "{funcao}" na CCT do sindicato {sindicato} no estado {uf}?
+    """Consulta piso salarial no banco (codigo puro, zero API).
 
-Considere:
-- Valores vigentes em 2025/2026
-- Se não conhecer a CCT exata, use como referência CCTs similares do mesmo segmento e região
-- O valor deve ser realista para o mercado de terceirização de serviços no {uf}
+    Busca nas tabelas ccts_construcao/residuos/vigilancia por funcao+sindicato.
+    Fallback: busca so por funcao em qualquer CCT.
+    """
+    import sqlite3
+    from config.settings import DB_PATH
 
-Responda SOMENTE com JSON: {{"piso_estimado": <float>, "fonte": "<nome da CCT de referência>", "confianca": "<alta|media|baixa>"}}"""
+    funcao_norm = _normalizar_texto(funcao)
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    tabelas = ["ccts_construcao", "ccts_residuos", "ccts_vigilancia"]
 
-    resultado = ask_claude_json(
-        system="Você é especialista em CCTs e pisos salariais de terceirização no Brasil.",
-        user=prompt,
-        max_tokens=200,
-        agente="precificador",
-    )
-    if resultado and resultado.get("piso_estimado"):
-        return float(resultado["piso_estimado"])
+    # 1. Match exato funcao + sindicato
+    for tab in tabelas:
+        try:
+            rows = conn.execute(
+                f"SELECT funcao, salario_base, sindicato FROM {tab} "
+                f"WHERE LOWER(sindicato) LIKE ? AND LOWER(funcao) LIKE ? "
+                f"ORDER BY vigencia_inicio DESC LIMIT 1",
+                (f"%{sindicato.lower()}%", f"%{funcao_norm}%")
+            ).fetchall()
+            if rows:
+                log.info(f"Piso {funcao}: R$ {rows[0]['salario_base']:.2f} (banco/{tab})")
+                conn.close()
+                return float(rows[0]["salario_base"])
+        except sqlite3.OperationalError:
+            continue
+
+    # 2. So por funcao
+    for tab in tabelas:
+        try:
+            rows = conn.execute(
+                f"SELECT funcao, salario_base FROM {tab} "
+                f"WHERE LOWER(funcao) LIKE ? ORDER BY vigencia_inicio DESC LIMIT 1",
+                (f"%{funcao_norm}%",)
+            ).fetchall()
+            if rows:
+                log.info(f"Piso {funcao}: R$ {rows[0]['salario_base']:.2f} (banco/funcao/{tab})")
+                conn.close()
+                return float(rows[0]["salario_base"])
+        except sqlite3.OperationalError:
+            continue
+
+    conn.close()
+
+    # 3. Nao encontrou no banco - tenta baixar CCT do Mediador MTE
+    log.info(f"Piso {funcao}/{sindicato}/{uf}: nao no banco, tentando baixar do Mediador MTE...")
+    try:
+        from core.skills.cct_mediador import baixar_cct_mediador
+        cct_baixada = baixar_cct_mediador(sindicato, uf)
+        if cct_baixada:
+            # Salva no banco e tenta de novo
+            conn = sqlite3.connect(DB_PATH)
+            conn.execute(
+                "INSERT OR IGNORE INTO ccts_construcao "
+                "(sindicato, uf, funcao, salario_base, vigencia_inicio, vigencia_fim, observacoes) "
+                "VALUES (?,?,?,?,?,?,?)",
+                (sindicato, uf, funcao, cct_baixada.get("salario", 0),
+                 cct_baixada.get("vigencia_inicio"), cct_baixada.get("vigencia_fim"),
+                 "Baixada automaticamente do Mediador MTE")
+            )
+            conn.commit(); conn.close()
+            if cct_baixada.get("salario"):
+                return float(cct_baixada["salario"])
+    except ImportError:
+        log.warning("Modulo cct_mediador nao implementado ainda")
+    except Exception as e:
+        log.warning(f"Erro baixando CCT: {e}")
+
+    # 4. CCT NAO ENCONTRADA - CRITICO, marca para revisao manual
+    log.error(f"CRITICO: CCT nao disponivel para {funcao}/{sindicato}/{uf}. "
+              f"CCT deve ser respeitada (legal). Marcando para revisao manual.")
     return None
 
 

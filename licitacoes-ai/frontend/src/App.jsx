@@ -1,8 +1,7 @@
-import { useState, useEffect, useCallback } from "react";
-import { api } from "./api";
-import KPIDashboard from "./components/KPIDashboard";
-import EditalTable from "./components/EditalTable";
-import EditalDetailPanel from "./components/EditalDetail";
+import { useState, useEffect } from "react";
+import { AuthProvider, useAuth } from "./AuthContext";
+import AppLayout from "./components/AppLayout";
+import Home from "./components/Home";
 import PncpSearch from "./components/PncpSearch";
 import Perfil from "./components/Perfil";
 import ConcorrentePanel from "./components/ConcorrentePanel";
@@ -11,152 +10,78 @@ import PlanilhaPanel from "./components/PlanilhaPanel";
 import PipelinePage from "./components/PipelinePage";
 import HabilitacaoPage from "./components/HabilitacaoPage";
 import Login from "./components/Login";
+import Landing from "./components/Landing";
+import AdminPanel from "./components/AdminPanel";
+import RadarRoot from "./radar/RadarRoot";
 
-const C = {
-  bg: "#09090B", s1: "#111114", s2: "#18181C", s3: "#222228",
-  b1: "#2A2A32", b2: "#3A3A44",
-  t1: "#EEEEE8", t2: "#98968E", t3: "#5A5854",
-  ac: "#BEFF3A", rd: "#FF4D4D", am: "#FFB038", tl: "#2EDDA8", bl: "#5A9EF7",
-};
+function pathToProduto(path) {
+  const p = (path || "/").replace(/^\/+/, "").split("/")[0];
+  const validas = new Set(["pipeline", "buscar", "radar", "pregoes", "planilhas", "habilitacao", "concorrentes", "perfil", "admin"]);
+  if (validas.has(p)) return p;
+  return "home";
+}
 
-const mono = "'JetBrains Mono', monospace";
+function navegar(path) {
+  window.history.pushState({}, "", path);
+  window.dispatchEvent(new PopStateEvent("popstate"));
+}
 
-function Dashboard({ onLogout }) {
-  const [editais, setEditais] = useState([]);
-  const [totalEditais, setTotalEditais] = useState(0);
-  const [filter, setFilter] = useState("todos");
-  const [selectedPncpId, setSelectedPncpId] = useState(null);
-  const [tab, setTab] = useState("pipeline");
-  const [searchText, setSearchText] = useState("");
-  const [period, setPeriod] = useState("90d");
+function PageRouter() {
+  const { tenant, isAdmin } = useAuth();
+  const [path, setPath] = useState(() => window.location.pathname);
+  const [period] = useState("90d");
 
-  const statusMap = {
-    todos: [],
-    novo: ["novo", "classificado"],
-    go: ["analisado", "go", "go_com_ressalvas", "go_sem_ressalvas"],
-    pronto: ["precificado", "competitivo_pronto"],
+  useEffect(() => {
+    const onPop = () => setPath(window.location.pathname);
+    window.addEventListener("popstate", onPop);
+    return () => window.removeEventListener("popstate", onPop);
+  }, []);
+
+  const produto = pathToProduto(path);
+
+  const config = {
+    home:         { tit: "Home",         sub: "Visão geral",            comp: <Home period={period} /> },
+    pipeline:     { tit: "Pipeline",     sub: "Boletim de editais",     comp: <PipelinePage /> },
+    buscar:       { tit: "Buscar PNCP",  sub: "Importar editais",       comp: <PncpSearch onImported={() => navegar("/pipeline")} /> },
+    radar:        { tit: "Radar",        sub: "Monitoramento em tempo real", comp: <RadarRoot /> },
+    pregoes:      { tit: "Disputa",      sub: "Lances + Robot",         comp: <PregaoPanel editais={[]} /> },
+    planilhas:    { tit: "Proposta",     sub: "Planilhas e BDI",        comp: <PlanilhaPanel /> },
+    habilitacao:  { tit: "Habilitação",  sub: "Documentos + CCT",       comp: <HabilitacaoPage /> },
+    concorrentes: { tit: "BI",           sub: "Concorrentes e mercado", comp: <ConcorrentePanel /> },
+    perfil:       { tit: "Empresa",      sub: "Cadastro e integrações", comp: <Perfil token={localStorage.getItem("token")} tenant={tenant} /> },
+    admin:        { tit: "Admin",        sub: "Acesso restrito",        comp: isAdmin ? <AdminPanel /> : <div style={{ color: "#FF4D4D", fontFamily: "monospace", fontSize: 13 }}>Acesso negado.</div> },
   };
 
-  const loadEditais = useCallback(async () => {
-    try {
-      const params = { per_page: 50, sort: "-score_relevancia" };
-      if (filter !== "todos") params.status = statusMap[filter];
-      const data = await api.getEditais(params);
-      // Filtra editais da extensão (vão só para Pregões, não Pipeline)
-      const pipelineItems = (data.items || []).filter(e => e.fonte !== "extension" && e.status !== "pregao_ext");
-      setEditais(pipelineItems);
-      setTotalEditais(pipelineItems.length);
-    } catch (e) { console.error(e); }
-  }, [filter]);
-
-  useEffect(() => { loadEditais(); }, [filter, loadEditais]);
-
-  const filters = [
-    { key: "todos", label: "Todos", count: totalEditais },
-    { key: "novo", label: "Novos", count: editais.filter(e => e.status === "novo" || e.status === "classificado").length },
-    { key: "go", label: "Go", count: editais.filter(e => (e.parecer || e.status || "").startsWith("go") || e.status === "analisado").length },
-    { key: "pronto", label: "Prontos", count: editais.filter(e => ["precificado", "competitivo_pronto"].includes(e.status)).length },
-  ];
+  const cfg = config[produto] || config.home;
 
   return (
-    <div style={{ fontFamily: "'Instrument Sans', 'DM Sans', sans-serif", color: C.t1, background: C.bg, minHeight: "100vh", position: "relative", overflow: "hidden" }}>
-      {/* Orbs de glow */}
-      <div style={{ position: "fixed", top: -200, left: -200, width: 600, height: 600, borderRadius: "50%", background: `radial-gradient(circle, ${C.ac}08, transparent 70%)`, pointerEvents: "none", animation: "breathe 8s ease-in-out infinite" }} />
-      <div style={{ position: "fixed", top: "40%", right: -300, width: 700, height: 700, borderRadius: "50%", background: `radial-gradient(circle, ${C.tl}06, transparent 70%)`, pointerEvents: "none", animation: "breathe 10s ease-in-out infinite 2s" }} />
-      <div style={{ position: "fixed", bottom: -200, left: "30%", width: 500, height: 500, borderRadius: "50%", background: `radial-gradient(circle, ${C.bl}05, transparent 70%)`, pointerEvents: "none", animation: "breathe 12s ease-in-out infinite 4s" }} />
-
-      <style>{`
-        @keyframes breathe { 0%,100% { opacity: 0.04 } 50% { opacity: 0.08 } }
-        @keyframes livePulse { 0%,100% { box-shadow: 0 0 0 0 rgba(190,255,58,0.4) } 50% { box-shadow: 0 0 0 6px rgba(190,255,58,0) } }
-        @import url('https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
-        body { margin: 0; background: ${C.bg}; }
-        ::-webkit-scrollbar { width: 6px; }
-        ::-webkit-scrollbar-track { background: ${C.s2}; }
-        ::-webkit-scrollbar-thumb { background: ${C.b2}; border-radius: 3px; }
-      `}</style>
-
-      <div style={{ maxWidth: tab === "pipeline" ? 1400 : 1060, margin: "0 auto", padding: "0 16px", position: "relative", zIndex: 1 }}>
-        {/* Header */}
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "20px 0 24px", flexWrap: "wrap", gap: 12 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <div style={{ width: 8, height: 8, borderRadius: "50%", background: C.ac, animation: "livePulse 2s infinite" }} />
-            <h1 style={{ fontSize: 20, fontWeight: 700, margin: 0, letterSpacing: -0.5, color: C.t1 }}>Licitações AI</h1>
-          </div>
-          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-            {["7d", "30d", "90d", "YTD"].map(p => (
-              <button key={p} onClick={() => setPeriod(p.toLowerCase())}
-                style={{
-                  fontFamily: mono, fontSize: 10, padding: "4px 10px", borderRadius: 6, cursor: "pointer", border: "none",
-                  background: period === p.toLowerCase() ? C.s3 : "transparent",
-                  color: period === p.toLowerCase() ? C.t1 : C.t3,
-                  fontWeight: 600,
-                }}>
-                {p}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* KPI Dashboard */}
-        <KPIDashboard period={period} />
-
-        {/* Tab navigation */}
-        <div style={{ display: "flex", gap: 4, marginBottom: 16, borderBottom: `1px solid ${C.b1}`, paddingBottom: 0 }}>
-          {[
-            { key: "pipeline", label: "Pipeline" },
-            { key: "buscar", label: "Oportunidades" },
-            { key: "pregoes", label: "Pregões" },
-            { key: "planilhas", label: "Planilhas" },
-            { key: "habilitacao", label: "Habilitação" },
-            { key: "concorrentes", label: "Concorrentes" },
-            { key: "perfil", label: "Empresas" },
-          ].map(t => (
-            <button key={t.key} onClick={() => setTab(t.key)}
-              style={{
-                fontFamily: mono, fontSize: 11, padding: "8px 16px", cursor: "pointer", fontWeight: 600, border: "none",
-                borderBottom: tab === t.key ? `2px solid ${C.ac}` : "2px solid transparent",
-                background: "none", color: tab === t.key ? C.t1 : C.t3, marginBottom: -1,
-                textTransform: "uppercase", letterSpacing: 1,
-              }}>
-              {t.label}
-            </button>
-          ))}
-        </div>
-
-        {tab === "pipeline" && <PipelinePage />}
-
-        {tab === "buscar" && (
-          <PncpSearch onImported={() => { loadEditais(); setTab("pipeline"); }} />
-        )}
-
-        {tab === "pregoes" && (
-          <PregaoPanel editais={editais} />
-        )}
-
-        {tab === "planilhas" && (
-          <PlanilhaPanel />
-        )}
-
-        {tab === "habilitacao" && (
-          <HabilitacaoPage />
-        )}
-
-        {tab === "concorrentes" && (
-          <ConcorrentePanel />
-        )}
-
-        {tab === "perfil" && (
-          <Perfil token="local" tenant={{ id: 1, nome_empresa: "Minha Empresa" }} />
-        )}
-
-        {selectedPncpId && (
-          <EditalDetailPanel pncpId={selectedPncpId} onClose={() => setSelectedPncpId(null)} onRefresh={loadEditais} />
-        )}
-      </div>
-    </div>
+    <AppLayout produto={produto} titulo={cfg.tit} subtitulo={cfg.sub}>
+      {cfg.comp}
+    </AppLayout>
   );
 }
 
+function MainApp() {
+  const { tenant, loading, login } = useAuth();
+  const [showLogin, setShowLogin] = useState(false);
+
+  // Preview da Landing mesmo logado: acesse /landing
+  if (window.location.pathname.replace(/\/+$/, "") === "/landing") {
+    return <Landing onStart={() => navegar("/")} />;
+  }
+
+  if (loading) {
+    return <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", color: "#999" }}>Carregando…</div>;
+  }
+  if (tenant) return <PageRouter />;
+  if (showLogin) return <Login onLogin={(t, tok) => login(t, tok)} />;
+  return <Landing onStart={() => setShowLogin(true)} />;
+}
+
 export default function App() {
-  return <Dashboard onLogout={() => {}} />;
+  return (
+    <AuthProvider>
+      <MainApp />
+    </AuthProvider>
+  );
 }

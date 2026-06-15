@@ -1,7 +1,58 @@
 {
   "empresas": [
     {
+      "nome": "São Lourenço Ambiental",
+      "apelido": "SL",
+      "cnpj": "10.636.946/0001-00",
+      "razao_social": "SAO LOURENCO AMBIENTAL LTDA",
+      "cnaes": ["3900-5/00"],
+      "regime_tributario": "simples_nacional",
+      "anexo_simples": "III",
+      "faixa_simples_default": 4,
+      "aliquota_efetiva_pct": 13.00,
+      "desonerada": false,
+      "porte": "EPP",
+      "endereco": {
+        "logradouro": "Rua Bion",
+        "numero": "26",
+        "bairro": "Chacaras Rio Petropolis",
+        "cidade": "Duque de Caxias",
+        "uf": "RJ"
+      },
+      "representante_legal": {
+        "nome": "Alex Sandro Borges de Morais",
+        "cargo": "Sócio Administrador"
+      },
+      "servicos": ["resíduos", "descontaminação", "gestão de resíduos", "coleta", "transporte", "destinação", "tratamento", "rss", "incineração", "aterro", "água oleosa"],
+      "atestados_disponiveis": [
+        "PREENCHER com atestados reais"
+      ],
+      "frota": {
+        "caminhao_compactador": {"modelo": "VW Constellation 2022", "quantidade": 1},
+        "caminhao_poliguindaste": {"quantidade": 0, "nota": "não possui — freta"},
+        "fiorino_rss": {"quantidade": 0, "nota": "não possui — loca"},
+        "conteineres_1200L": {"possui": true},
+        "conteineres_240L": {"possui": true},
+        "bombonas_30L": {"possui": true},
+        "cacambas_5m3": {"quantidade": 3}
+      },
+      "destinacao": {
+        "classe_iia_por_tonelada": 75.03,
+        "classe_iib_por_tonelada": 75.03,
+        "rss_por_kg": 4.00,
+        "parceiro_incineracao": "Renove"
+      },
+      "licencas": {
+        "inea_lo": {"preencher": true},
+        "ibama_ctf_app": {"preencher": true},
+        "comlurb": {"preencher": true}
+      },
+      "restricoes": {},
+      "uf_atuacao": ["RJ"]
+    },
+    {
       "nome": "Manutec",
+      "apelido": "MANUTEC",
       "cnpj": "PREENCHER",
       "cnaes": ["8121-4/00", "8111-7/00", "8130-3/00", "7810-8/00"],
       "regime_tributario": "lucro_real",
@@ -11,7 +62,7 @@
       "rat_ajustado_pct": 2.0,
       "pis_efetivo_pct": 0.05,
       "cofins_efetivo_pct": 4.15,
-      "servicos": ["obras", "limpeza", "conservação", "terceirização", "mão de obra terceirizada", "infraestrutura", "pavimentação", "engenharia"],
+      "servicos": ["obras", "limpeza", "conservação", "terceirização", "mão de obra terceirizada", "infraestrutura", "pavimentação", "engenharia", "manutenção predial", "instalações hidráulicas", "instalações elétricas", "pintura", "reforma"],
       "atestados_disponiveis": [
         "limpeza predial (área mínima 5.000m²)",
         "conservação e manutenção predial",
@@ -32,6 +83,7 @@
     },
     {
       "nome": "Miami Segurança",
+      "apelido": "MIAMI VIG",
       "cnpj": "PREENCHER",
       "cnaes": ["8012-9/00", "8011-1/01", "8020-0/01"],
       "regime_tributario": "lucro_real",
@@ -51,6 +103,7 @@
     },
     {
       "nome": "Miami Serviços",
+      "apelido": "MIAMI SERVIÇOS",
       "cnpj": "PREENCHER",
       "cnaes": ["8211-3/00", "7810-8/00"],
       "regime_tributario": "lucro_real",
@@ -60,7 +113,7 @@
       "rat_ajustado_pct": 2.0,
       "pis_efetivo_pct": 0.05,
       "cofins_efetivo_pct": 4.15,
-      "servicos": ["apoio administrativo", "recepção", "portaria", "copeiragem", "limpeza", "terceirização", "secretariado", "telefonia"],
+      "servicos": ["apoio administrativo", "recepção", "portaria", "copeiragem", "limpeza", "terceirização", "secretariado", "telefonia", "brigada de incêndio", "bombeiros civis", "jardinagem", "paisagismo", "agentes escolar", "transporte escolar"],
       "atestados_disponiveis": [
         "apoio administrativo",
         "recepção e portaria",
@@ -69,6 +122,20 @@
       ],
       "restricoes": {},
       "uf_atuacao": ["RJ"]
+    },
+    {
+      "nome": "B7 Soluções",
+      "apelido": "B7",
+      "cnpj": "PREENCHER",
+      "cnaes": ["4120-4/00", "4399-1/99"],
+      "regime_tributario": "PREENCHER",
+      "servicos": ["obras", "construção", "reforma", "edificação", "pavimentação", "engenharia", "habitacional", "casa catarina", "mcmv"],
+      "atestados_disponiveis": [
+        "PREENCHER com atestados reais"
+      ],
+      "restricoes": {},
+      "uf_atuacao": ["SC", "RJ"],
+      "nota": "Principal operação em SC, eventualmente RJ"
     }
   ]
 }

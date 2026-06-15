@@ -12,7 +12,11 @@ import sys
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from shared.database import init_db
-from api.routes import dashboard, editais, concorrentes, config, auth, perfil, pregoes, lances_robot, alertas, planilhas, habilitacao
+from api.routes import (
+    dashboard, editais, concorrentes, config, auth, perfil, perfil_integracoes,
+    pregoes, lances_robot, alertas, planilhas, habilitacao,
+    radar, radar_alertas, radar_historico, radar_sse, radar_metrics,
+)
 
 log = logging.getLogger("api")
 
@@ -35,6 +39,12 @@ app.include_router(concorrentes.router)
 app.include_router(config.router)
 app.include_router(auth.router)
 app.include_router(perfil.router)
+app.include_router(perfil_integracoes.router)
+app.include_router(radar.router)
+app.include_router(radar_alertas.router)
+app.include_router(radar_historico.router)
+app.include_router(radar_sse.router)
+app.include_router(radar_metrics.router)
 app.include_router(pregoes.router)
 app.include_router(lances_robot.router)
 app.include_router(alertas.router)
@@ -51,6 +61,20 @@ def health():
 def startup():
     init_db()
     log.info("API iniciada")
+    try:
+        from radar.worker.scheduler import iniciar
+        iniciar(intervalo_seg=10)
+    except Exception as e:
+        log.exception(f"Falha iniciando scheduler do Radar: {e}")
+
+
+@app.on_event("shutdown")
+async def shutdown():
+    try:
+        from radar.adapters.comprasnet_live import encerrar_browser
+        await encerrar_browser()
+    except Exception as e:
+        log.warning(f"Falha ao encerrar browser ComprasNet live: {e}")
 
 
 # Rota raiz — serve index.html

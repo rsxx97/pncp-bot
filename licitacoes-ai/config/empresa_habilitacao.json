@@ -1,0 +1,81 @@
+{
+  "empresas": [
+    {
+      "key": "manutec",
+      "razao_social": "MANUTEC SERVIÇOS GERAIS LTDA",
+      "nome_fantasia": "Manutec",
+      "cnpj": "00.000.000/0001-00",
+      "inscricao_estadual": "",
+      "inscricao_municipal": "",
+      "endereco": {
+        "logradouro": "Rua Exemplo",
+        "numero": "123",
+        "complemento": "",
+        "bairro": "Centro",
+        "cidade": "Rio de Janeiro",
+        "uf": "RJ",
+        "cep": "20000-000"
+      },
+      "contato": {
+        "telefone": "(21) 0000-0000",
+        "email": "contato@manutec.com.br",
+        "site": "www.manutec.com.br"
+      },
+      "representante_legal": {
+        "nome": "Bruno Campos",
+        "cargo": "Sócio Administrador",
+        "rg": "00.000.000-0",
+        "orgao_emissor": "SSP/RJ",
+        "cpf": "000.000.000-00",
+        "nacionalidade": "brasileiro",
+        "estado_civil": "casado"
+      },
+      "porte": "ME",
+      "regime_tributario": "Lucro Real",
+      "banco": {
+        "nome": "Banco do Brasil",
+        "agencia": "0000",
+        "conta": "00000-0",
+        "tipo": "corrente"
+      },
+      "certidoes": {
+        "cnd_federal": {
+          "arquivo": "data/habilitacao/manutec/cnd_federal.pdf",
+          "validade": "",
+          "emissao": "",
+          "url_reemissao": "https://servicos.receita.fazenda.gov.br/Servicos/certidao/CndConjuntaInter/InformaNICertidao.asp?tipo=2"
+        },
+        "cnd_fgts": {
+          "arquivo": "data/habilitacao/manutec/cnd_fgts.pdf",
+          "validade": "",
+          "emissao": "",
+          "url_reemissao": "https://consulta-crf.caixa.gov.br/consultacrf/pages/consultaEmpregador.jsf"
+        },
+        "cnd_trabalhista": {
+          "arquivo": "data/habilitacao/manutec/cnd_trabalhista.pdf",
+          "validade": "",
+          "emissao": "",
+          "url_reemissao": "https://cndt-certidao.tst.jus.br/inicio.faces"
+        },
+        "cnd_estadual": {
+          "arquivo": "data/habilitacao/manutec/cnd_estadual.pdf",
+          "validade": "",
+          "emissao": "",
+          "url_reemissao": "https://www.fazenda.rj.gov.br/"
+        },
+        "cnd_municipal": {
+          "arquivo": "data/habilitacao/manutec/cnd_municipal.pdf",
+          "validade": "",
+          "emissao": "",
+          "url_reemissao": ""
+        },
+        "cnd_falencia": {
+          "arquivo": "data/habilitacao/manutec/cnd_falencia.pdf",
+          "validade": "",
+          "emissao": "",
+          "url_reemissao": "https://www4.tjrj.jus.br/CertidaoEletronica/"
+        }
+      }
+    }
+  ]
+}

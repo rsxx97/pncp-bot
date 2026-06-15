@@ -2,7 +2,7 @@
 
 Cada posto gera 1 aba com Módulos 1-6.
 Aba RESUMO consolida todos os postos.
-Aba BREAK-EVEN simula 7 cenários de lance.
+Aba BREAK-EVEN: 11 cenários CI/Lucro (10/10 → 0/0) + simulador de lance + resumo.
 
 Todas as células de valor usam fórmulas Excel (=SUM, =cell*cell, etc.)
 para que o usuário possa alterar inputs e ver recálculo automático.
@@ -637,32 +637,46 @@ def _build_resumo_sheet(ws, postos, sheet_names, empresa_info, licitacao_info):
 # Aba BREAK-EVEN
 # ---------------------------------------------------------------------------
 def _build_breakeven_sheet(ws, postos, sheet_names, empresa_info, licitacao_info):
-    """Constrói aba BREAK-EVEN com 7 cenários variando CI/Lucro."""
+    """Aba BREAK-EVEN limpa em 5 seções: Referências → Custo Puro →
+    Cenários CI/Lucro 10%/10% a 0%/0% → Simulador de Lance → Resumo Estratégico.
+    """
     valor_teto = licitacao_info.get("valor_teto", 0) or 0
 
-    ws.column_dimensions['A'].width = 4
-    ws.column_dimensions['B'].width = 30
-    ws.column_dimensions['C'].width = 9
-    ws.column_dimensions['D'].width = 9
+    # Larguras
+    ws.column_dimensions['A'].width = 5
+    ws.column_dimensions['B'].width = 36
+    ws.column_dimensions['C'].width = 11
+    ws.column_dimensions['D'].width = 11
     ws.column_dimensions['E'].width = 18
-    ws.column_dimensions['F'].width = 13
-    ws.column_dimensions['G'].width = 16
-    ws.column_dimensions['H'].width = 14
-    ws.column_dimensions['I'].width = 16
+    ws.column_dimensions['F'].width = 18
+    ws.column_dimensions['G'].width = 18
+    ws.column_dimensions['H'].width = 13
+    ws.column_dimensions['I'].width = 17
 
-    _s(ws, 1, 1, "ANÁLISE DE BREAK-EVEN E CENÁRIOS DE LANCE", BOLD)
-    ws.merge_cells("A1:I1")
+    def _banner(row, text):
+        """Faixa colorida full-width (A:I)."""
+        for col in range(1, 10):
+            _s(ws, row, col, text if col == 1 else "", BOLD_W, HEADER_FILL)
+        ws.merge_cells(f"A{row}:I{row}")
 
-    # Referências
+    # =====================================================================
+    # 1. TÍTULO + REFERÊNCIAS DO EDITAL
+    # =====================================================================
+    _banner(1, "ANÁLISE DE BREAK-EVEN E CENÁRIOS DE LANCE")
+
     _s(ws, 3, 2, "REFERÊNCIAS DO EDITAL", BOLD)
     _s(ws, 4, 2, "Teto Edital (anual):")
-    _s(ws, 4, 5, valor_teto, BOLD, INPUT_FILL, FMT_BRL)  # E4
-    _s(ws, 5, 2, "Inexequibilidade (50%):")
-    _formula(ws, 5, 5, "=E4*0.5")
+    _s(ws, 4, 5, valor_teto, BOLD, INPUT_FILL, FMT_BRL)            # E4
+    _s(ws, 5, 2, "Inexequibilidade (50% do teto):")
+    _formula(ws, 5, 5, "=E4*0.5")                                  # E5
+    _s(ws, 5, 7, "Lei 14.133 art. 59 §4", SMALL)
 
-    # Break-even por cargo (custo puro = D71 de cada aba = subtotal sem M6)
-    _s(ws, 7, 2, "BREAK-EVEN POR CARGO (CI=0% / Lucro=0%)", BOLD)
-    for col, h in [(2, "Cargo"), (3, "Postos"), (5, "Custo/Emp/Mês"), (6, "Custo Mensal"), (9, "Custo Anual")]:
+    # =====================================================================
+    # 2. CUSTO PURO POR CARGO (sem CI/Lucro/Tributos = piso absoluto)
+    # =====================================================================
+    _banner(7, "CUSTO PURO POR CARGO  (M1+M2+M3+M4+M5, sem CI/Lucro/Tributos)")
+    for col, h in [(1, "#"), (2, "Cargo"), (3, "Postos"), (5, "Custo/Emp/Mês"),
+                   (6, "Custo Mensal Total"), (9, "Custo Anual Total")]:
         _s(ws, 8, col, h, BOLD_W, HEADER_FILL, align=ALIGN_CENTER)
 
     for i, (posto, sname) in enumerate(zip(postos, sheet_names)):
@@ -670,89 +684,154 @@ def _build_breakeven_sheet(ws, postos, sheet_names, empresa_info, licitacao_info
         _s(ws, row, 1, i + 1, align=ALIGN_CENTER)
         _s(ws, row, 2, posto.get("funcao", "").upper())
         _formula(ws, row, 3, f"='{sname}'!B4", fmt='0')
-        # Custo puro = D71 (subtotal M1-M5, sem CI/Lucro/Tributos)
         _formula(ws, row, 5, f"='{sname}'!D71")
         _formula(ws, row, 6, f"=C{row}*E{row}")
         _formula(ws, row, 9, f"=F{row}*12")
 
     r_be = 9 + len(postos)
-    _s(ws, r_be, 2, "CUSTO PURO (BREAK-EVEN)", BOLD, TOTAL_FILL)
+    _s(ws, r_be, 2, "TOTAL CUSTO PURO ANUAL", BOLD, TOTAL_FILL)
     _formula(ws, r_be, 6, f"=SUM(F9:F{r_be-1})", BOLD, TOTAL_FILL)
     _formula(ws, r_be, 9, f"=SUM(I9:I{r_be-1})", BOLD, TOTAL_FILL)
-    _s(ws, r_be + 1, 2, "Abaixo deste valor = PREJUÍZO", RED_BOLD)
+    _s(ws, r_be + 1, 2, "Abaixo deste valor a empresa OPERA NO PREJUÍZO.", RED_BOLD)
 
-    # Total tributos % — referência da 1ª aba de posto (C76)
+    # Referências p/ fórmulas
     trib_ref = f"'{sheet_names[0]}'!C76" if sheet_names else "0"
+    be_cell = f"I{r_be}"                            # custo puro anual
+    custo_efetivo = f"({be_cell}/(1-{trib_ref}))"   # custo anual + tributos por dentro
 
-    # Cenários
+    # =====================================================================
+    # 3. CENÁRIOS CI / LUCRO  (de 10%/10% até 0%/0%, passo 1%)
+    # =====================================================================
     r = r_be + 3
-    _s(ws, r, 2, "SIMULADOR DE CENÁRIOS", BOLD)
+    _banner(r, "CENÁRIOS CI / LUCRO  —  de 10%/10% até 0%/0% (BREAK-EVEN)")
     r += 1
-    for col, h in [(2, "Cenário"), (3, "CI%"), (4, "Lucro%"), (5, "Valor Anual"),
-                   (6, "Desc/Teto"), (7, "Margem Bruta"), (8, "Margem/Mês"), (9, "Status")]:
+    for col, h in [(1, "#"), (2, "Cenário"), (3, "CI %"), (4, "Lucro %"),
+                   (5, "Valor Anual"), (6, "Valor Mensal"),
+                   (7, "Margem R$ Anual"), (8, "Desc / Teto"), (9, "Status")]:
         _s(ws, r, col, h, BOLD_W, HEADER_FILL, align=ALIGN_CENTER)
 
-    cenarios = [
-        ("Conservador (3%/3%)", 0.03, 0.03),
-        ("Moderado (2.5%/2.5%)", 0.025, 0.025),
-        ("Agressivo (2%/2%)", 0.02, 0.02),
-        ("Muito agressivo (1.5%/1.5%)", 0.015, 0.015),
-        ("Mínimo (1%/1%)", 0.01, 0.01),
-        ("Ultra-mínimo (0.5%/0.5%)", 0.005, 0.005),
-        ("BREAK-EVEN (0%/0%)", 0.0, 0.0),
-    ]
+    # 11 cenários: 10/10, 9/9, ..., 1/1, 0/0
+    cenarios = []
+    for n in range(10, -1, -1):
+        nome = "BREAK-EVEN (0% / 0%)" if n == 0 else f"CI {n}% / Lucro {n}%"
+        cenarios.append((nome, n / 100, n / 100))
 
-    r_header = r
+    r_first = r + 1
     for i, (nome_c, ci, lucro) in enumerate(cenarios):
-        cr = r_header + 1 + i
+        cr = r_first + i
+        is_be = (ci == 0)
+        font_c = BOLD if is_be else NORMAL
+        fill_c = TOTAL_FILL if is_be else None
         _s(ws, cr, 1, i + 1, align=ALIGN_CENTER)
-        _s(ws, cr, 2, nome_c)
-        _s(ws, cr, 3, ci, None, None, FMT_PCT)
-        _s(ws, cr, 4, lucro, None, None, FMT_PCT)
-        # Valor Anual = custo_puro_anual * (1+CI+Lucro) / (1-trib%)
-        be_cell = f"I{r_be}"
+        _s(ws, cr, 2, nome_c, font_c, fill_c)
+        _s(ws, cr, 3, ci, PCT_FONT, INPUT_FILL, FMT_PCT)
+        _s(ws, cr, 4, lucro, PCT_FONT, INPUT_FILL, FMT_PCT)
+        # Valor Anual = custo_puro * (1+CI+Lucro) / (1-tributos)
         _formula(ws, cr, 5, f"={be_cell}*(1+C{cr}+D{cr})/(1-{trib_ref})")
-        # Desconto / Teto
-        _formula(ws, cr, 6, f"=IF(E4=0,0,1-E{cr}/E4)", fmt=FMT_PCT)
-        # Margem Bruta = Valor - custo_puro/(1-trib)
-        _formula(ws, cr, 7, f"=E{cr}-{be_cell}/(1-{trib_ref})")
-        # Margem/Mês
-        _formula(ws, cr, 8, f"=G{cr}/12")
+        # Valor Mensal
+        _formula(ws, cr, 6, f"=E{cr}/12")
+        # Margem R$ Anual = Valor - Custo Efetivo (custo puro com tributos)
+        _formula(ws, cr, 7, f"=E{cr}-{custo_efetivo}")
+        # Desc / Teto
+        _formula(ws, cr, 8, f"=IF(E4=0,0,1-E{cr}/E4)", fmt=FMT_PCT)
         # Status
         ws.cell(row=cr, column=9).value = (
-            f'=IF(E{cr}<E5,"INEXEQUÍVEL",'
-            f'IF(E{cr}>E4,"ACIMA REF",'
-            f'IF(F{cr}>0.15,"RISCO","OK")))'
+            f'=IF(E{cr}>E4,"ACIMA TETO",'
+            f'IF(E{cr}<E5,"INEXEQUÍVEL",'
+            f'IF(C{cr}+D{cr}=0,"BREAK-EVEN",'
+            f'IF(C{cr}+D{cr}>=0.10,"PREMIUM",'
+            f'IF(C{cr}+D{cr}>=0.05,"OK","APERTADO")))))'
         )
 
-    # Resumo estratégico
-    r_first = r_header + 1
-    r = r_first + len(cenarios) + 1
-    _s(ws, r, 2, "RESUMO ESTRATÉGICO", BOLD)
+    IDX_BE = len(cenarios) - 1   # 0%/0% sempre o último
+
+    # =====================================================================
+    # 4. SIMULADOR DE LANCE  (top-down: dado lance, calcula margem)
+    # =====================================================================
+    r = r_first + len(cenarios) + 2
+    _banner(r, "SIMULADOR DE LANCE  —  digite % desconto OU valor anual livre")
     r += 1
-    _s(ws, r, 2, "Lance inicial (3%/3%):", BOLD)
-    _formula(ws, r, 5, f"=E{r_first}")
-    _formula(ws, r, 6, f"=F{r_first}", fmt=FMT_PCT)
+    for col, h in [(1, "#"), (2, "Cenário Lance"), (3, "% Desconto"),
+                   (5, "Valor Anual"), (6, "Valor Mensal"),
+                   (7, "Margem R$ Anual"), (8, "Margem %"), (9, "Status")]:
+        _s(ws, r, col, h, BOLD_W, HEADER_FILL, align=ALIGN_CENTER)
+
+    descontos_lance = [0.0, 0.05, 0.10, 0.15, 0.20, 0.25, 0.30, 0.35, 0.40, 0.45, 0.50]
+    r_lance_first = r + 1
+
+    for i, desc in enumerate(descontos_lance):
+        cr = r_lance_first + i
+        _s(ws, cr, 1, i + 1, align=ALIGN_CENTER)
+        _s(ws, cr, 2, f"Lance {int(desc*100)}% desconto sobre o teto")
+        _s(ws, cr, 3, desc, PCT_FONT, INPUT_FILL, FMT_PCT)
+        _formula(ws, cr, 5, f"=E4*(1-C{cr})")
+        _formula(ws, cr, 6, f"=E{cr}/12")
+        _formula(ws, cr, 7, f"=E{cr}-{custo_efetivo}")
+        _formula(ws, cr, 8, f"=IF(E{cr}=0,0,G{cr}/E{cr})", fmt=FMT_PCT)
+        ws.cell(row=cr, column=9).value = (
+            f'=IF(E{cr}<E5,"INEXEQUÍVEL",'
+            f'IF(G{cr}<0,"PREJUÍZO",'
+            f'IF(H{cr}<0.02,"RISCO",'
+            f'IF(H{cr}<0.05,"APERTADO","OK"))))'
+        )
+
+    # LANCE LIVRE — usuário digita valor anual em E
+    cr = r_lance_first + len(descontos_lance)
+    _s(ws, cr, 1, len(descontos_lance) + 1, align=ALIGN_CENTER)
+    _s(ws, cr, 2, "LANCE LIVRE  —  digite valor anual em E", BOLD)
+    _formula(ws, cr, 3, f"=IF(E4=0,0,1-E{cr}/E4)", fmt=FMT_PCT)
+    _s(ws, cr, 5, 0, BOLD, INPUT_FILL, FMT_BRL)
+    _formula(ws, cr, 6, f"=E{cr}/12")
+    _formula(ws, cr, 7, f"=E{cr}-{custo_efetivo}")
+    _formula(ws, cr, 8, f"=IF(E{cr}=0,0,G{cr}/E{cr})", fmt=FMT_PCT)
+    ws.cell(row=cr, column=9).value = (
+        f'=IF(E{cr}=0,"PREENCHA",'
+        f'IF(E{cr}<E5,"INEXEQUÍVEL",'
+        f'IF(G{cr}<0,"PREJUÍZO",'
+        f'IF(H{cr}<0.02,"RISCO",'
+        f'IF(H{cr}<0.05,"APERTADO","OK")))))'
+    )
+
+    # =====================================================================
+    # 5. RESUMO ESTRATÉGICO
+    # =====================================================================
+    r = cr + 3
+    _banner(r, "RESUMO ESTRATÉGICO")
     r += 1
-    _s(ws, r, 2, "Lance competitivo (2%/2%):", BOLD)
-    _formula(ws, r, 5, f"=E{r_first+2}")
-    _formula(ws, r, 6, f"=F{r_first+2}", fmt=FMT_PCT)
+    _s(ws, r, 2, "Indicador", BOLD_W, HEADER_FILL)
+    _s(ws, r, 5, "Anual", BOLD_W, HEADER_FILL, align=ALIGN_CENTER)
+    _s(ws, r, 6, "Mensal", BOLD_W, HEADER_FILL, align=ALIGN_CENTER)
+    _s(ws, r, 8, "% / Desc", BOLD_W, HEADER_FILL, align=ALIGN_CENTER)
     r += 1
-    _s(ws, r, 2, "PISO ABSOLUTO (break-even):", BOLD)
-    _formula(ws, r, 5, f"=E{r_first+6}")
-    _formula(ws, r, 6, f"=F{r_first+6}", fmt=FMT_PCT)
+    _s(ws, r, 2, "Teto Edital", BOLD)
+    _formula(ws, r, 5, "=E4")
+    _formula(ws, r, 6, "=E4/12")
     r += 1
-    _s(ws, r, 2, "Inexequibilidade (50% teto):")
+    _s(ws, r, 2, "Inexequibilidade (50% teto)", BOLD)
     _formula(ws, r, 5, "=E5")
+    _formula(ws, r, 6, "=E5/12")
+    r += 1
+    _s(ws, r, 2, "Custo Puro (sem CI/Lucro/Trib)", BOLD)
+    _formula(ws, r, 5, f"={be_cell}")
+    _formula(ws, r, 6, f"={be_cell}/12")
+    r += 1
+    _s(ws, r, 2, "Custo Efetivo (com tributos)", BOLD)
+    _formula(ws, r, 5, f"={custo_efetivo}")
+    _formula(ws, r, 6, f"={custo_efetivo}/12")
+    r += 1
+    _s(ws, r, 2, "PISO BREAK-EVEN (CI=0% / Lucro=0%)", BOLD, TOTAL_FILL)
+    _formula(ws, r, 5, f"=E{r_first+IDX_BE}", BOLD, TOTAL_FILL)
+    _formula(ws, r, 6, f"=E{r_first+IDX_BE}/12", BOLD, TOTAL_FILL)
+    _formula(ws, r, 8, f"=H{r_first+IDX_BE}", BOLD, TOTAL_FILL, fmt=FMT_PCT)
+    r += 1
+    _s(ws, r, 2, "Margem disponível até teto (R$)", BOLD)
+    _formula(ws, r, 5, f"=E4-E{r_first+IDX_BE}")
+    _formula(ws, r, 6, f"=(E4-E{r_first+IDX_BE})/12")
     r += 2
     _s(ws, r, 2, "DESCONTO MÁXIMO SUSTENTÁVEL:", BOLD)
-    _formula(ws, r, 5, f"=F{r_first+6}", fmt=FMT_PCT)
+    _formula(ws, r, 8, f"=H{r_first+IDX_BE}", BOLD, fmt=FMT_PCT)
     r += 1
-    _s(ws, r, 2, "VALOR MÍNIMO ABSOLUTO (anual):", BOLD)
-    _formula(ws, r, 5, f"=E{r_first+6}")
-    r += 1
-    _s(ws, r, 2, "VALOR MÍNIMO ABSOLUTO (mensal):", BOLD)
-    _formula(ws, r, 5, f"=E{r_first+6}/12")
+    _s(ws, r, 2, "(qualquer lance abaixo deste valor = PREJUÍZO)", SMALL)
 
 
 # ---------------------------------------------------------------------------

@@ -1,8 +1,9 @@
 """Rotas de métricas do dashboard — design premium."""
 from datetime import datetime, date, timedelta
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, Query, Depends
 
-from api.deps import get_connection
+from api.deps import get_connection, tenant_filter_sql
+from api.routes.auth import get_current_tenant
 
 router = APIRouter(prefix="/api/dashboard", tags=["dashboard"])
 
@@ -36,17 +37,19 @@ def _is_monitor_active(monitor) -> bool:
 
 
 @router.get("/metrics")
-def get_metrics(period: str = Query("90d")):
+def get_metrics(period: str = Query("90d"), tenant: dict = Depends(get_current_tenant)):
     conn = get_connection()
     pf = _period_filter(period)
     hoje = date.today().isoformat()
 
-    total = conn.execute(f"SELECT COUNT(*) as c FROM editais WHERE 1=1 {pf}").fetchone()["c"]
-    score60 = conn.execute(f"SELECT COUNT(*) as c FROM editais WHERE score_relevancia >= 60 {pf}").fetchone()["c"]
-    planilhas = conn.execute(f"SELECT COUNT(*) as c FROM editais WHERE planilha_path IS NOT NULL {pf}").fetchone()["c"]
-    volume = conn.execute(f"SELECT COALESCE(SUM(valor_estimado),0) as c FROM editais WHERE status != 'arquivado' {pf}").fetchone()["c"]
+    t_sql, t_params = tenant_filter_sql(tenant)
 
-    go_count = conn.execute(f"SELECT COUNT(*) as c FROM editais WHERE parecer LIKE 'go%' {pf}").fetchone()["c"]
+    total = conn.execute(f"SELECT COUNT(*) as c FROM editais WHERE {t_sql} {pf}", t_params).fetchone()["c"]
+    score60 = conn.execute(f"SELECT COUNT(*) as c FROM editais WHERE {t_sql} AND score_relevancia >= 60 {pf}", t_params).fetchone()["c"]
+    planilhas = conn.execute(f"SELECT COUNT(*) as c FROM editais WHERE {t_sql} AND planilha_path IS NOT NULL {pf}", t_params).fetchone()["c"]
+    volume = conn.execute(f"SELECT COALESCE(SUM(valor_estimado),0) as c FROM editais WHERE {t_sql} AND status != 'arquivado' {pf}", t_params).fetchone()["c"]
+
+    go_count = conn.execute(f"SELECT COUNT(*) as c FROM editais WHERE {t_sql} AND parecer LIKE 'go%' {pf}", t_params).fetchone()["c"]
     taxa_go = round(go_count / total * 100, 1) if total > 0 else 0
 
     custo_row = conn.execute(

@@ -1,0 +1,63 @@
+# Sensitive — env vars vão pelo Railway dashboard, NUNCA no build context
+.env
+.env.*
+!.env.example
+
+# Backups locais
+_backup_pre_deploy/
+*.bak
+*.backup
+
+# DB local — vamos subir SEPARADO pro volume Railway
+data/licitacoes.db
+data/licitacoes.db-shm
+data/licitacoes.db-wal
+data/*.db
+data/editais_urgentes/
+data/skills/
+data/extratos_pncp_cache/
+data/planilhas_vigilancia/
+
+# Caches & build
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Frontend build artifacts (já estão em api/static/)
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+node_modules/
+
+# Git / IDE / OS
+.git/
+.gitignore
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# Venv
+.venv/
+venv/
+env/
+
+# Documentação que não precisa no container
+*.md
+!README.md
+CLAUDE.md
+RETOMADA.md
+KANBAN.md
+ROADMAP.md
+INFORMES.pdf
+
+# Worktrees do Claude
+.claude/

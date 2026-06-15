@@ -7,7 +7,9 @@ from fastapi import APIRouter, Query, HTTPException, UploadFile, File
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
 
-from api.deps import get_connection
+from api.deps import get_connection, tenant_filter_sql
+from api.routes.auth import get_current_tenant
+from fastapi import Depends
 
 
 class PostoManual(BaseModel):
@@ -305,12 +307,16 @@ def listar_editais(
     sort: str = Query("-score_relevancia"),
     busca: str = Query(None),
     abertas: bool = Query(False),
+    tenant: dict = Depends(get_current_tenant),
 ):
     conn = get_connection()
     where = []
     params = []
 
-    # Exclui editais da extensão do pipeline (vão para Pregões)
+    tenant_sql, tenant_params = tenant_filter_sql(tenant)
+    where.append(tenant_sql)
+    params.extend(tenant_params)
+
     where.append("(fonte IS NULL OR fonte != 'extension')")
     where.append("status != 'pregao_ext'")
 

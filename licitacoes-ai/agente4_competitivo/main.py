@@ -11,12 +11,9 @@ from shared.database import (
     get_edital, get_editais_pendentes, atualizar_status_edital,
     adicionar_comentario, init_db,
 )
-from shared.llm_client import ask_claude_json
+# LLM removido — usa motor_matematico (código puro)
 from agente4_competitivo.concorrente_profiler import sincronizar_concorrentes
 from agente4_competitivo.lance_analyzer import analisar_competitividade
-from agente4_competitivo.prompts import (
-    SYSTEM_ANALISE_COMPETITIVA, PROMPT_ANALISE_COMPETITIVA,
-)
 
 log = logging.getLogger("agente4_competitivo")
 
@@ -89,47 +86,67 @@ def analisar_edital_competitivo(pncp_id: str) -> dict | None:
         uf=edital.get("uf", "RJ"),
     )
 
-    # 2. Enriquecimento via LLM
+    # 2. Enriquecimento com motor_matematico (codigo puro, zero API)
     try:
-        concorrentes_texto = _formatar_concorrentes(resultado_comp.get("perfis_concorrentes", []))
+        perfis = resultado_comp.get("perfis_concorrentes", [])
+        margem_sugerida = resultado_comp.get("margem_sugerida_pct", 5.0)
+        piso_inex = resultado_comp.get("piso_inexequibilidade", 0)
 
-        # Cenários BDI do edital (se disponível)
-        cenarios_texto = "Não disponível."
+        # Classifica concorrentes (agressivo/moderado/conservador)
+        agressivos = [p for p in perfis if p.get("desconto_medio_pct", 0) > 15]
+        conservadores = [p for p in perfis if p.get("desconto_medio_pct", 0) < 5]
 
-        prompt = PROMPT_ANALISE_COMPETITIVA.format(
-            objeto=edital.get("objeto", ""),
-            valor_referencia=f"{valor_referencia:,.2f}",
-            uf=edital.get("uf", "RJ"),
-            adjudicacao=analise.get("adjudicacao", "menor preço"),
-            prazo_meses=prazo_meses,
-            valor_proposta=f"{valor_proposta:,.2f}",
-            bdi_pct=f"{bdi_pct:.2f}",
-            margem_pct=f"{resultado_comp.get('margem_sugerida_pct', 0):.1f}",
-            piso_inexequibilidade=f"{resultado_comp.get('piso_inexequibilidade', 0):,.2f}",
-            concorrentes_texto=concorrentes_texto,
-            cenarios_texto=cenarios_texto,
+        # Estrategia baseada em competitividade e inexequibilidade
+        desconto_atual = ((valor_referencia - valor_proposta) / valor_referencia * 100) if valor_referencia else 0
+        if valor_proposta < piso_inex:
+            estrategia = "risco_inexequibilidade"
+        elif len(agressivos) >= 3:
+            estrategia = "agressiva"  # muitos agressivos, precisa descer
+        elif len(conservadores) > len(agressivos):
+            estrategia = "conservadora"  # mercado conservador, mantem margem
+        else:
+            estrategia = "moderada"
+
+        # Riscos identificados (rule-based)
+        riscos = []
+        if valor_proposta < piso_inex * 1.05:
+            riscos.append("Proposta próxima ao piso de inexequibilidade")
+        if len(agressivos) >= 2:
+            riscos.append(f"{len(agressivos)} concorrentes agressivos na regiao")
+        if prazo_meses < 6:
+            riscos.append("Prazo curto — dificulta diluicao de custos fixos")
+
+        # Oportunidades
+        oportunidades = []
+        if not perfis:
+            oportunidades.append("Edital sem histórico de concorrentes conhecidos — menor competicao")
+        if desconto_atual < 5 and len(conservadores) > 0:
+            oportunidades.append("Mercado conservador e proposta pouco descontada — boa margem")
+        if margem_sugerida > 10:
+            oportunidades.append("Margem sugerida acima de 10% — espaço para negociar")
+
+        # Dicas negociacao
+        dicas = []
+        if estrategia == "agressiva":
+            dicas.append("Avaliar reducao de 2-3% na proposta para competir com agressivos")
+        if estrategia == "conservadora":
+            dicas.append("Manter proposta, mercado aceita margens maiores")
+        if len(perfis) > 5:
+            dicas.append("Muitos concorrentes ativos — focar em atestados e diferenciais técnicos")
+
+        resultado_comp["estrategia"] = estrategia
+        resultado_comp["riscos"] = riscos
+        resultado_comp["oportunidades"] = oportunidades
+        resultado_comp["dicas_negociacao"] = dicas
+        resultado_comp["justificativa"] = (
+            f"Analise rule-based: {len(perfis)} concorrentes historicos "
+            f"({len(agressivos)} agressivos, {len(conservadores)} conservadores). "
+            f"Estrategia: {estrategia}. Desconto atual: {desconto_atual:.1f}%."
         )
-
-        llm_result = ask_claude_json(
-            system=SYSTEM_ANALISE_COMPETITIVA,
-            user=prompt,
-            max_tokens=2000,
-            agente="competitivo",
-            pncp_id=pncp_id,
-        )
-
-        # Merge LLM com rule-based
-        if llm_result.get("lance_recomendado"):
-            resultado_comp["lance_llm"] = llm_result["lance_recomendado"]
-        resultado_comp["estrategia"] = llm_result.get("estrategia", "moderada")
-        resultado_comp["riscos"] = llm_result.get("riscos", [])
-        resultado_comp["oportunidades"] = llm_result.get("oportunidades", [])
-        resultado_comp["dicas_negociacao"] = llm_result.get("dicas_negociacao", [])
-        if llm_result.get("justificativa"):
-            resultado_comp["justificativa_llm"] = llm_result["justificativa"]
+        resultado_comp["_metodo"] = "motor_matematico_puro"
 
     except Exception as e:
-        log.warning(f"LLM indisponível para análise competitiva: {e}. Usando apenas rule-based.")
+        log.warning(f"Erro na analise rule-based: {e}")
 
     # 3. Atualizar banco
     analise_comp_json = json.dumps(resultado_comp, ensure_ascii=False, default=str)

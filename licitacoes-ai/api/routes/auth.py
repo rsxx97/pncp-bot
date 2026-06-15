@@ -1,67 +1,74 @@
-"""Rotas de autenticação — registro, login, perfil."""
-import hashlib
-import secrets
-import time
+"""Autenticação SaaS — bcrypt + JWT + RBAC (super_admin / tenant_admin)."""
+from datetime import datetime, timedelta, timezone
 from fastapi import APIRouter, HTTPException, Depends, Header
 from pydantic import BaseModel, EmailStr
+import bcrypt
+import jwt
 
-from api.deps import get_connection
+import sys
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).parent.parent.parent))
+
+from config.settings import JWT_SECRET, JWT_ALGORITHM, JWT_EXPIRE_HOURS
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
-# JWT simplificado com HMAC-SHA256
-_SECRET = "licitacoes-ai-secret-key-2026"  # Em produção, usar env var
-
 
 def _hash_senha(senha: str) -> str:
-    return hashlib.sha256(senha.encode()).hexdigest()
+    return bcrypt.hashpw(senha.encode("utf-8")[:72], bcrypt.gensalt()).decode("utf-8")
 
 
-def _gerar_token(tenant_id: int) -> str:
-    """Gera token simples: tenant_id.timestamp.signature"""
-    payload = f"{tenant_id}.{int(time.time())}"
-    sig = hashlib.sha256(f"{payload}.{_SECRET}".encode()).hexdigest()[:16]
-    return f"{payload}.{sig}"
-
-
-def _verificar_token(token: str) -> int | None:
-    """Verifica token e retorna tenant_id ou None."""
+def _verificar_senha(senha: str, senha_hash: str) -> bool:
     try:
-        parts = token.split(".")
-        if len(parts) != 3:
-            return None
-        tenant_id, ts, sig = int(parts[0]), int(parts[1]), parts[2]
-        expected = hashlib.sha256(f"{tenant_id}.{ts}.{_SECRET}".encode()).hexdigest()[:16]
-        if sig != expected:
-            return None
-        # Token válido por 30 dias
-        if time.time() - ts > 30 * 86400:
-            return None
-        return tenant_id
-    except (ValueError, IndexError):
+        return bcrypt.checkpw(senha.encode("utf-8")[:72], senha_hash.encode("utf-8"))
+    except Exception:
+        return False
+
+
+def _gerar_token(tenant_id: int, role: str) -> str:
+    payload = {
+        "sub": str(tenant_id),
+        "role": role,
+        "iat": datetime.now(timezone.utc),
+        "exp": datetime.now(timezone.utc) + timedelta(hours=JWT_EXPIRE_HOURS),
+    }
+    return jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGORITHM)
+
+
+def _decodificar_token(token: str) -> dict | None:
+    try:
+        return jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
+    except jwt.PyJWTError:
         return None
 
 
 def get_current_tenant(authorization: str = Header(None)) -> dict | None:
-    """Dependency: extrai tenant do header Authorization.
-    Retorna None se não autenticado (permite acesso público).
-    """
+    """Retorna tenant autenticado ou None se sem token / inválido."""
     if not authorization:
         return None
     token = authorization.replace("Bearer ", "")
-    tenant_id = _verificar_token(token)
-    if not tenant_id:
+    payload = _decodificar_token(token)
+    if not payload:
         return None
-
     from shared.database import get_tenant
-    return get_tenant(tenant_id)
+    tenant = get_tenant(int(payload["sub"]))
+    if tenant:
+        tenant["role"] = payload.get("role", tenant.get("role", "tenant_admin"))
+    return tenant
 
 
 def require_tenant(authorization: str = Header(...)) -> dict:
-    """Dependency: exige autenticação."""
     tenant = get_current_tenant(authorization)
     if not tenant:
         raise HTTPException(401, "Token inválido ou expirado")
+    if not tenant.get("ativo"):
+        raise HTTPException(403, "Conta desativada")
+    return tenant
+
+
+def require_admin(tenant: dict = Depends(require_tenant)) -> dict:
+    if tenant.get("role") != "super_admin":
+        raise HTTPException(403, "Apenas administradores")
     return tenant
 
 
@@ -69,14 +76,19 @@ def require_tenant(authorization: str = Header(...)) -> dict:
 
 class RegisterRequest(BaseModel):
     nome_empresa: str
-    email: str
+    email: EmailStr
     senha: str
     cnpj: str | None = None
 
 
 class LoginRequest(BaseModel):
-    email: str
+    email: EmailStr
     senha: str
+
+
+class TrocarSenhaRequest(BaseModel):
+    senha_atual: str
+    senha_nova: str
 
 
 # ── Rotas ────────────────────────────────────────────────────────────
@@ -85,19 +97,20 @@ class LoginRequest(BaseModel):
 def register(body: RegisterRequest):
     from shared.database import criar_tenant, get_tenant_by_email
 
-    existing = get_tenant_by_email(body.email)
-    if existing:
+    if get_tenant_by_email(body.email):
         raise HTTPException(409, "Email já cadastrado")
 
-    tenant_id = criar_tenant(
+    if len(body.senha) < 6:
+        raise HTTPException(400, "Senha precisa ter ao menos 6 caracteres")
+
+    criar_tenant(
         nome_empresa=body.nome_empresa,
         email=body.email,
         senha_hash=_hash_senha(body.senha),
         cnpj=body.cnpj,
     )
-
     return {
-        "message": "Cadastro realizado! Aguarde aprovação do administrador.",
+        "message": "Cadastro realizado. Aguarde aprovação do administrador.",
         "pendente": True,
     }
 
@@ -107,19 +120,16 @@ def login(body: LoginRequest):
     from shared.database import get_tenant_by_email
 
     tenant = get_tenant_by_email(body.email)
-    if not tenant or tenant["senha_hash"] != _hash_senha(body.senha):
+    if not tenant or not _verificar_senha(body.senha, tenant["senha_hash"]):
         raise HTTPException(401, "Email ou senha inválidos")
 
-    if not tenant["ativo"]:
+    if not tenant.get("ativo"):
         raise HTTPException(403, "Conta desativada")
 
-    # Verifica aprovação
-    conn = get_connection()
-    row = conn.execute("SELECT aprovado FROM tenants WHERE id = ?", (tenant["id"],)).fetchone()
-    if row and not row["aprovado"]:
-        raise HTTPException(403, "Cadastro pendente de aprovação. Entre em contato com o administrador.")
+    if not tenant.get("aprovado"):
+        raise HTTPException(403, "Cadastro pendente de aprovação.")
 
-    token = _gerar_token(tenant["id"])
+    token = _gerar_token(tenant["id"], tenant.get("role", "tenant_admin"))
     return {
         "token": token,
         "tenant": {
@@ -127,48 +137,39 @@ def login(body: LoginRequest):
             "nome_empresa": tenant["nome_empresa"],
             "email": tenant["email"],
             "plano": tenant["plano"],
+            "plano_radar_limite": tenant.get("plano_radar_limite", 50),
+            "role": tenant.get("role", "tenant_admin"),
+            "senha_temporaria": bool(tenant.get("senha_temporaria", 0)),
         },
     }
 
 
-# ── Admin: aprovar/rejeitar usuários ──
+@router.post("/senha")
+def trocar_senha(body: TrocarSenhaRequest, tenant: dict = Depends(require_tenant)):
+    from shared.database import atualizar_senha_tenant
 
-@router.get("/pendentes")
-def listar_pendentes():
-    """Lista usuários aguardando aprovação."""
-    conn = get_connection()
-    rows = conn.execute("SELECT id, nome_empresa, email, cnpj, criado_em FROM tenants WHERE aprovado = 0 AND ativo = 1").fetchall()
-    return [dict(r) for r in rows]
+    if not _verificar_senha(body.senha_atual, tenant["senha_hash"]):
+        raise HTTPException(401, "Senha atual incorreta")
 
+    if len(body.senha_nova) < 6:
+        raise HTTPException(400, "Senha nova precisa ter ao menos 6 caracteres")
 
-@router.post("/aprovar/{tenant_id}")
-def aprovar_usuario(tenant_id: int):
-    """Aprova um usuário pendente."""
-    conn = get_connection()
-    conn.execute("UPDATE tenants SET aprovado = 1 WHERE id = ?", (tenant_id,))
-    conn.commit()
-    return {"ok": True, "message": "Usuário aprovado"}
-
-
-@router.post("/rejeitar/{tenant_id}")
-def rejeitar_usuario(tenant_id: int):
-    """Rejeita/desativa um usuário."""
-    conn = get_connection()
-    conn.execute("UPDATE tenants SET ativo = 0 WHERE id = ?", (tenant_id,))
-    conn.commit()
-    return {"ok": True, "message": "Usuário rejeitado"}
+    atualizar_senha_tenant(tenant["id"], _hash_senha(body.senha_nova), senha_temporaria=0)
+    return {"ok": True, "message": "Senha alterada"}
 
 
 @router.get("/me")
 def me(tenant: dict = Depends(require_tenant)):
     from shared.database import get_tenant_empresas
-
     empresas = get_tenant_empresas(tenant["id"])
     return {
         "id": tenant["id"],
         "nome_empresa": tenant["nome_empresa"],
         "email": tenant["email"],
         "plano": tenant["plano"],
+        "plano_radar_limite": tenant.get("plano_radar_limite", 50),
+        "role": tenant.get("role", "tenant_admin"),
+        "senha_temporaria": bool(tenant.get("senha_temporaria", 0)),
         "empresas": [
             {
                 "id": e["id"],
@@ -183,3 +184,35 @@ def me(tenant: dict = Depends(require_tenant)):
             for e in empresas
         ],
     }
+
+
+# ── Admin (super_admin only) ─────────────────────────────────────────
+
+@router.get("/pendentes")
+def listar_pendentes(_admin: dict = Depends(require_admin)):
+    from shared.database import listar_tenants
+    return listar_tenants(somente_pendentes=True)
+
+
+@router.get("/tenants")
+def listar_todos_tenants(_admin: dict = Depends(require_admin)):
+    from shared.database import listar_tenants
+    return listar_tenants(somente_pendentes=False)
+
+
+@router.post("/aprovar/{tenant_id}")
+def aprovar_usuario(tenant_id: int, _admin: dict = Depends(require_admin)):
+    from shared.database import get_db
+    conn = get_db()
+    conn.execute("UPDATE tenants SET aprovado = 1 WHERE id = ?", (tenant_id,))
+    conn.commit()
+    return {"ok": True, "message": "Tenant aprovado"}
+
+
+@router.post("/rejeitar/{tenant_id}")
+def rejeitar_usuario(tenant_id: int, _admin: dict = Depends(require_admin)):
+    from shared.database import get_db
+    conn = get_db()
+    conn.execute("UPDATE tenants SET ativo = 0 WHERE id = ?", (tenant_id,))
+    conn.commit()
+    return {"ok": True, "message": "Tenant desativado"}

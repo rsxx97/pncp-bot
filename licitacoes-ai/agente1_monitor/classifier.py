@@ -54,10 +54,20 @@ def score_rapido(edital: EditalResumo) -> int:
     keywords_limpeza = ["limpeza", "conservação", "asseio", "facilities", "predial", "zeladoria"]
     keywords_admin = ["apoio administrativo", "recepção", "portaria", "copeiragem"]
     keywords_seg = ["vigilância", "segurança", "vigia", "brigada", "bombeiro"]
+    # SL (sao-lourenco) — resíduos industriais/vegetais/perigosos + serviços ambientais
+    keywords_residuos = [
+        "resíduo", "residuo", "resíduos", "residuos",
+        "coleta de lixo", "coleta seletiva", "limpeza urbana",
+        "destinação final", "destinacao final",
+        "transporte de resíduo", "transporte de residuo",
+        "descontaminação", "descontaminacao",
+    ]
     keywords_manut = ["manutenção predial", "engenharia", "construção", "reforma"]
     keywords_terceirizacao = ["terceirização", "mão de obra", "mao de obra"]
 
-    if any(k in objeto for k in keywords_limpeza):
+    if any(k in objeto for k in keywords_residuos):
+        score += 40   # resíduos = nicho exclusivo SL, alta prioridade
+    elif any(k in objeto for k in keywords_limpeza):
         score += 40
     elif any(k in objeto for k in keywords_seg):
         score += 35
@@ -98,9 +108,11 @@ def score_rapido(edital: EditalResumo) -> int:
     elif edital.modalidade_cod == 4:  # Concorrência Loss
         score += 6
 
-    # Penalidade se federal + Manutec tem sanção
+    # Penalidade FEDERAL aplica apenas para Manutec (que tem sanção AGU).
+    # Outras empresas do grupo (Miami, Blue, SL) NÃO têm sanção federal.
     esfera = derivar_esfera(edital.orgao_cnpj)
-    if esfera == "federal":
+    empresa = sugerir_empresa(edital)
+    if esfera == "federal" and empresa == "manutec":
         score = max(score - 10, 0)
 
     return min(score, 100)
@@ -112,11 +124,20 @@ def sugerir_empresa(edital: EditalResumo) -> str:
 
     keywords_miami = ["vigilância", "segurança", "vigia", "controlador de acesso", "brigada", "bombeiro"]
     keywords_blue = ["apoio administrativo", "recepção", "recepcionista", "portaria", "copeira", "copeiragem"]
+    # SL (sao-lourenco) — resíduos / limpeza urbana / serviços ambientais
+    keywords_sl = [
+        "resíduo", "residuo", "coleta de lixo", "coleta seletiva",
+        "limpeza urbana", "destinação final", "destinacao final",
+        "transporte de resíduo", "transporte de residuo",
+        "descontaminação", "descontaminacao",
+    ]
 
     if any(k in objeto for k in keywords_miami):
         return "miami"
     if any(k in objeto for k in keywords_blue):
         return "blue"
+    if any(k in objeto for k in keywords_sl):
+        return "sao-lourenco"
     return "manutec"
 
 
@@ -193,37 +214,11 @@ def _build_user_prompt(edital: EditalResumo) -> str:
 
 
 def classificar_llm(edital: EditalResumo) -> ClassificacaoEdital:
-    """Classificação via Claude API (mais precisa, usa tokens)."""
-    from shared.llm_client import ask_claude_json
-
-    user_prompt = _build_user_prompt(edital)
-
-    try:
-        result = ask_claude_json(
-            system=SYSTEM_PROMPT,
-            user=user_prompt,
-            max_tokens=512,
-            agente="monitor_classifier",
-            pncp_id=edital.pncp_id,
-        )
-
-        return ClassificacaoEdital(
-            pncp_id=edital.pncp_id,
-            score=result.get("score", 0),
-            justificativa=result.get("justificativa", ""),
-            empresa_sugerida=result.get("empresa_sugerida", "manutec"),
-            tags=result.get("tags", []),
-            alertas=result.get("alertas", []),
-        )
-
-    except Exception as e:
-        log.error(f"Erro na classificação LLM para {edital.pncp_id}: {e}")
-        # Fallback para classificação rápida
-        return classificar_rapido(edital)
+    """DEPRECATED — use classificar_rapido (codigo puro, zero API)."""
+    log.warning("classificar_llm: redirecionando para codigo puro (zero API)")
+    return classificar_rapido(edital)
 
 
 def classificar(edital: EditalResumo, usar_llm: bool = False) -> ClassificacaoEdital:
-    """Classifica edital. Usa LLM se configurado, senão heurística."""
-    if usar_llm:
-        return classificar_llm(edital)
+    """Classifica edital via keyword matching (codigo puro, zero custo)."""
     return classificar_rapido(edital)

@@ -20,7 +20,16 @@ MODALIDADES_NOME = {
     6: "Pregão Eletrônico",
     7: "Pregão Presencial",
     8: "Dispensa de Licitação",
+    # Adicionado 2026-05-28 após investigação: 557 editais RJ caíam em
+    # "Código 9" porque modalidade 9 (Inexigibilidade) não estava mapeada.
+    # Bot náutico/SL já filtram inexigibilidade via SQL — esse fix garante que
+    # editais futuros entrem com o nome legível, não como "Código 9".
+    9: "Inexigibilidade de Licitação",
 }
+# TODO upstream: auditar mapeamento contra tabela PNCP Lei 14.133 oficial
+# (https://pncp.gov.br) — códigos 1 (Leilão), 2 (Diálogo Competitivo) também
+# parecem ausentes; e 5/6/7 podem divergir da tabela atual. Não mexido para
+# não introduzir regressão em ingestion já produtivo.
 
 # Rate limit: max 2 req/s
 _last_request_time = 0.0

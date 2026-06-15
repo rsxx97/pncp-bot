@@ -16,9 +16,11 @@ def get_db() -> sqlite3.Connection:
     """Retorna conexão SQLite com row_factory = sqlite3.Row."""
     if not hasattr(_local, "conn") or _local.conn is None:
         DATA_DIR.mkdir(parents=True, exist_ok=True)
-        _local.conn = sqlite3.connect(str(DB_PATH), timeout=10)
+        _local.conn = sqlite3.connect(str(DB_PATH), timeout=30)
         _local.conn.row_factory = sqlite3.Row
         _local.conn.execute("PRAGMA journal_mode=WAL")
+        _local.conn.execute("PRAGMA busy_timeout=30000")
+        _local.conn.execute("PRAGMA synchronous=NORMAL")
         _local.conn.execute("PRAGMA foreign_keys=ON")
     return _local.conn
 
@@ -176,8 +178,10 @@ CREATE TABLE IF NOT EXISTS tenants (
     email TEXT UNIQUE NOT NULL,
     senha_hash TEXT NOT NULL,
     plano TEXT DEFAULT 'free',
+    role TEXT DEFAULT 'tenant_admin',
     ativo BOOLEAN DEFAULT 1,
     aprovado INTEGER DEFAULT 0,
+    senha_temporaria INTEGER DEFAULT 0,
     created_at TEXT DEFAULT (datetime('now')),
     updated_at TEXT DEFAULT (datetime('now'))
 );
@@ -284,11 +288,214 @@ CREATE TABLE IF NOT EXISTS pregao_classificacao (
 """
 
 
+def _coluna_existe(conn, tabela: str, coluna: str) -> bool:
+    rows = conn.execute(f"PRAGMA table_info({tabela})").fetchall()
+    return any(r["name"] == coluna for r in rows)
+
+
+def _aplicar_migrations(conn):
+    """Migrations idempotentes para schemas que evoluem entre versões."""
+    if not _coluna_existe(conn, "tenants", "role"):
+        conn.execute("ALTER TABLE tenants ADD COLUMN role TEXT DEFAULT 'tenant_admin'")
+    if not _coluna_existe(conn, "tenants", "senha_temporaria"):
+        conn.execute("ALTER TABLE tenants ADD COLUMN senha_temporaria INTEGER DEFAULT 0")
+    if not _coluna_existe(conn, "editais", "tenant_id"):
+        conn.execute("ALTER TABLE editais ADD COLUMN tenant_id INTEGER")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_editais_tenant ON editais(tenant_id)")
+    if not _coluna_existe(conn, "editais", "tenant_empresa_id"):
+        conn.execute("ALTER TABLE editais ADD COLUMN tenant_empresa_id INTEGER")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_editais_tenant_empresa ON editais(tenant_empresa_id)")
+    if not _coluna_existe(conn, "editais", "trello_card_id"):
+        conn.execute("ALTER TABLE editais ADD COLUMN trello_card_id TEXT")
+    if not _coluna_existe(conn, "editais", "drive_folder_id"):
+        conn.execute("ALTER TABLE editais ADD COLUMN drive_folder_id TEXT")
+    for col in ("trello_api_key", "trello_token", "trello_board_id", "drive_folder_id"):
+        if not _coluna_existe(conn, "tenant_empresas", col):
+            conn.execute(f"ALTER TABLE tenant_empresas ADD COLUMN {col} TEXT")
+
+    # Cota do plano Radar (paridade eLicitaRadar)
+    if not _coluna_existe(conn, "tenants", "plano_radar_limite"):
+        conn.execute("ALTER TABLE tenants ADD COLUMN plano_radar_limite INTEGER DEFAULT 50")
+
+    conn.executescript(_RADAR_SCHEMA_SQL)
+
+    # Migrations pós-schema (após CREATE TABLE IF NOT EXISTS dos schemas radar)
+    if not _coluna_existe(conn, "radar_pregoes_monitorados", "favorito"):
+        conn.execute("ALTER TABLE radar_pregoes_monitorados ADD COLUMN favorito INTEGER DEFAULT 0")
+
+    _seed_portais(conn)
+
+
+_RADAR_SCHEMA_SQL = """
+CREATE TABLE IF NOT EXISTS portais (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    slug TEXT UNIQUE NOT NULL,
+    nome TEXT NOT NULL,
+    base_url TEXT NOT NULL,
+    tipo_integracao TEXT NOT NULL,
+    ativo INTEGER DEFAULT 1
+);
+
+CREATE TABLE IF NOT EXISTS credenciais_portal (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    tenant_id INTEGER NOT NULL,
+    portal_id INTEGER NOT NULL,
+    login_cifrado TEXT NOT NULL,
+    senha_cifrada TEXT NOT NULL,
+    extra_cifrado TEXT,
+    status TEXT DEFAULT 'ok',
+    ultimo_login_em TEXT,
+    criado_em TEXT DEFAULT (datetime('now')),
+    UNIQUE(tenant_id, portal_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_cred_tenant ON credenciais_portal(tenant_id);
+
+CREATE TABLE IF NOT EXISTS radar_pregoes_monitorados (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    tenant_id INTEGER NOT NULL,
+    tenant_empresa_id INTEGER,
+    portal_id INTEGER NOT NULL,
+    identificador TEXT NOT NULL,
+    numero TEXT,
+    orgao TEXT,
+    objeto TEXT,
+    data_abertura TEXT,
+    status TEXT DEFAULT 'agendado',
+    fase TEXT,
+    snapshot_json TEXT,
+    polling_seg_sessao INTEGER DEFAULT 30,
+    polling_seg_idle INTEGER DEFAULT 300,
+    silenciado INTEGER DEFAULT 0,
+    monitorado_desde TEXT DEFAULT (datetime('now')),
+    ultima_consulta_em TEXT,
+    proxima_consulta_em TEXT,
+    UNIQUE(tenant_id, portal_id, identificador)
+);
+
+CREATE INDEX IF NOT EXISTS idx_pregoes_proxima ON radar_pregoes_monitorados(proxima_consulta_em) WHERE silenciado = 0;
+CREATE INDEX IF NOT EXISTS idx_pregoes_tenant ON radar_pregoes_monitorados(tenant_id);
+
+CREATE TABLE IF NOT EXISTS radar_eventos (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    tenant_id INTEGER NOT NULL,
+    pregao_monitorado_id INTEGER NOT NULL,
+    tipo TEXT NOT NULL,
+    criticidade TEXT DEFAULT 'normal',
+    titulo TEXT,
+    descricao TEXT,
+    payload_json TEXT,
+    criado_em TEXT DEFAULT (datetime('now')),
+    lido_em TEXT
+);
+
+CREATE INDEX IF NOT EXISTS idx_eventos_tenant ON radar_eventos(tenant_id, criado_em DESC);
+CREATE INDEX IF NOT EXISTS idx_eventos_pregao ON radar_eventos(pregao_monitorado_id, criado_em DESC);
+CREATE INDEX IF NOT EXISTS idx_eventos_nao_lidos ON radar_eventos(tenant_id, lido_em);
+
+CREATE TABLE IF NOT EXISTS radar_alertas_config (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    tenant_id INTEGER NOT NULL,
+    tipo_evento TEXT NOT NULL,
+    canal TEXT NOT NULL,
+    ativo INTEGER DEFAULT 1,
+    regras_json TEXT,
+    UNIQUE(tenant_id, tipo_evento, canal)
+);
+
+CREATE INDEX IF NOT EXISTS idx_alertas_tenant ON radar_alertas_config(tenant_id);
+
+CREATE TABLE IF NOT EXISTS radar_notificacoes_log (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    tenant_id INTEGER NOT NULL,
+    evento_id INTEGER NOT NULL,
+    canal TEXT NOT NULL,
+    status TEXT NOT NULL,
+    erro TEXT,
+    enviado_em TEXT DEFAULT (datetime('now'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_notif_log_evento ON radar_notificacoes_log(evento_id);
+CREATE INDEX IF NOT EXISTS idx_notif_log_tenant ON radar_notificacoes_log(tenant_id, enviado_em DESC);
+
+CREATE TABLE IF NOT EXISTS radar_web_push_subs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    tenant_id INTEGER NOT NULL,
+    endpoint TEXT UNIQUE NOT NULL,
+    p256dh TEXT NOT NULL,
+    auth TEXT NOT NULL,
+    user_agent TEXT,
+    criado_em TEXT DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS radar_throttle (
+    tenant_id INTEGER NOT NULL,
+    tipo_canal TEXT NOT NULL,
+    ultima_em TEXT NOT NULL,
+    PRIMARY KEY(tenant_id, tipo_canal)
+);
+
+-- Tracking de custo do 2captcha (por solve) + circuit breaker em IP-ban
+CREATE TABLE IF NOT EXISTS radar_custo_captcha (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    tenant_id INTEGER NOT NULL,
+    evento TEXT NOT NULL,           -- 'solve_ok' | 'solve_falhou' | 'ip_banido'
+    valor_brl REAL DEFAULT 0,       -- estimativa: 0,06 BRL por solve OK
+    detalhe TEXT,
+    criado_em TEXT DEFAULT (datetime('now'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_custo_captcha_tenant_data
+    ON radar_custo_captcha(tenant_id, criado_em DESC);
+
+-- Circuit breaker: bloqueia tentativas por janela após N falhas seguidas
+CREATE TABLE IF NOT EXISTS radar_circuit_breaker (
+    tenant_id INTEGER PRIMARY KEY,
+    portal_slug TEXT NOT NULL,
+    falhas_consecutivas INTEGER DEFAULT 0,
+    bloqueado_ate TEXT,             -- ISO datetime; NULL = não bloqueado
+    ultimo_erro TEXT,
+    atualizado_em TEXT DEFAULT (datetime('now'))
+);
+
+-- Cache compartilhado de snapshot por pregão (1 fetch atende N clientes monitorando o mesmo)
+-- Cobra Elicita-style: se 50 clientes monitoram CRAS Delamare Japeri, fazemos 1 request a cada N seg
+CREATE TABLE IF NOT EXISTS radar_snapshot_cache (
+    portal_slug TEXT NOT NULL,
+    identificador TEXT NOT NULL,
+    snapshot_json TEXT NOT NULL,
+    atualizado_em TEXT NOT NULL DEFAULT (datetime('now')),
+    PRIMARY KEY (portal_slug, identificador)
+);
+
+CREATE INDEX IF NOT EXISTS idx_snap_cache_freshness ON radar_snapshot_cache(atualizado_em DESC);
+"""
+
+
+_PORTAIS_SEED = [
+    ("pncp", "PNCP", "https://pncp.gov.br", "api_oficial"),
+    ("comprasnet", "Compras.gov.br (ComprasNet)", "https://www.comprasnet.gov.br", "scraping_authn"),
+    ("bll", "BLL Compras", "https://www.bll.org.br", "scraping_authn"),
+    ("bec_sp", "BEC-SP", "https://www.bec.sp.gov.br", "scraping_authn"),
+    ("licitacoes_e", "Licitações-e (BB)", "https://www.licitacoes-e.com.br", "scraping_captcha"),
+    ("portal_compras_publicas", "Portal de Compras Públicas", "https://www.portaldecompraspublicas.com.br", "scraping_authn"),
+    ("elicsc", "eLicSC (SC)", "https://www.elicsc.com.br", "scraping_authn"),
+]
+
+
+def _seed_portais(conn):
+    for slug, nome, url, tipo in _PORTAIS_SEED:
+        conn.execute(
+            "INSERT OR IGNORE INTO portais (slug, nome, base_url, tipo_integracao) VALUES (?, ?, ?, ?)",
+            (slug, nome, url, tipo),
+        )
+
+
 def init_db():
     """Cria todas as tabelas se não existirem."""
     conn = get_db()
     conn.executescript(SCHEMA_SQL)
-    # Garante singleton do monitor_state
+    _aplicar_migrations(conn)
     conn.execute(
         "INSERT OR IGNORE INTO monitor_state (id, ativo) VALUES (1, 1)"
     )
@@ -610,14 +817,43 @@ def adicionar_comentario(pncp_id: str, texto: str, tipo: str = "anotacao", autor
 
 # ── CRUD: Tenants (SaaS) ──────────────────────────────────────────────
 
-def criar_tenant(nome_empresa: str, email: str, senha_hash: str, cnpj: str = None) -> int:
+def criar_tenant(
+    nome_empresa: str,
+    email: str,
+    senha_hash: str,
+    cnpj: str = None,
+    role: str = "tenant_admin",
+    aprovado: int = 0,
+    senha_temporaria: int = 0,
+) -> int:
     conn = get_db()
     cur = conn.execute(
-        "INSERT INTO tenants (nome_empresa, cnpj, email, senha_hash) VALUES (?, ?, ?, ?)",
-        (nome_empresa, cnpj, email, senha_hash),
+        """INSERT INTO tenants
+           (nome_empresa, cnpj, email, senha_hash, role, aprovado, senha_temporaria)
+           VALUES (?, ?, ?, ?, ?, ?, ?)""",
+        (nome_empresa, cnpj, email, senha_hash, role, aprovado, senha_temporaria),
     )
     conn.commit()
     return cur.lastrowid
+
+
+def atualizar_senha_tenant(tenant_id: int, senha_hash: str, senha_temporaria: int = 0):
+    conn = get_db()
+    conn.execute(
+        "UPDATE tenants SET senha_hash = ?, senha_temporaria = ?, updated_at = datetime('now') WHERE id = ?",
+        (senha_hash, senha_temporaria, tenant_id),
+    )
+    conn.commit()
+
+
+def listar_tenants(somente_pendentes: bool = False) -> list[dict]:
+    conn = get_db()
+    sql = "SELECT id, nome_empresa, cnpj, email, plano, role, ativo, aprovado, created_at FROM tenants"
+    if somente_pendentes:
+        sql += " WHERE aprovado = 0 AND ativo = 1"
+    sql += " ORDER BY created_at DESC"
+    rows = conn.execute(sql).fetchall()
+    return [dict(r) for r in rows]
 
 
 def get_tenant_by_email(email: str) -> dict | None:

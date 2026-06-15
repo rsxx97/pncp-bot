@@ -41,9 +41,16 @@ def _get_anthropic_key():
 
 
 def _use_gemini():
-    """Retorna True se Gemini está configurado e disponível.
-    Desabilitado temporariamente - quota esgotada."""
-    return False  # TODO: reabilitar quando tiver nova API key
+    """Sempre usa Gemini (grátis). Claude foi desativado por ser pago."""
+    return bool(_get_gemini_key())
+
+
+def _claude_disabled():
+    raise RuntimeError(
+        "Claude API está DESATIVADA por decisão de produto (custo zero). "
+        "Use Gemini grátis (GEMINI_API_KEY) ou refatore pro código puro "
+        "(regex/motor_matematico)."
+    )
 
 
 def _ask_gemini(system: str, user: str, max_tokens: int = 4096) -> str:
@@ -70,7 +77,8 @@ def _ask_gemini(system: str, user: str, max_tokens: int = 4096) -> str:
 
 
 def _ask_claude(system: str, user: str, max_tokens: int = 4096) -> str:
-    """Chamada ao Claude (fallback pago)."""
+    """DESATIVADO — Claude é pago. Use Gemini grátis ou código puro."""
+    _claude_disabled()
     import anthropic
     from config.settings import CLAUDE_MODEL
 
@@ -99,19 +107,18 @@ def ask_claude(
     """Chamada ao LLM. Usa Gemini Flash (grátis) se disponível, senão Claude."""
     _rate_limit()
     start = time.time()
-    provider = "gemini" if _use_gemini() else "claude"
+
+    if not _use_gemini():
+        raise RuntimeError(
+            "GEMINI_API_KEY não configurada. Sistema usa apenas Gemini grátis + código puro. "
+            "Claude foi desativado por ser pago."
+        )
 
     for attempt in range(3):
         try:
-            if provider == "gemini":
-                text = _ask_gemini(system, user, max_tokens)
-            else:
-                text = _ask_claude(system, user, max_tokens)
-
+            text = _ask_gemini(system, user, max_tokens)
             duracao = time.time() - start
-            custo = 0.0 if provider == "gemini" else 0.05  # estimativa
-
-            log.info(f"{provider} [{agente}]: {duracao:.1f}s, ${custo:.4f}")
+            log.info(f"gemini [{agente}]: {duracao:.1f}s (grátis)")
 
             registrar_execucao(
                 agente=agente,
@@ -119,20 +126,15 @@ def ask_claude(
                 status="sucesso",
                 duracao_seg=duracao,
                 tokens_usados=0,
-                custo_estimado=custo,
+                custo_estimado=0.0,
             )
-
             return text
 
         except Exception as e:
             wait = 2 ** (attempt + 1)
-            log.warning(f"{provider} erro (tentativa {attempt+1}/3): {e}")
+            log.warning(f"gemini erro (tentativa {attempt+1}/3): {e}")
             if attempt < 2:
                 time.sleep(wait)
-                # Se Gemini falhou, tenta Claude como fallback
-                if provider == "gemini" and _get_anthropic_key():
-                    log.info("Fallback para Claude...")
-                    provider = "claude"
             else:
                 registrar_execucao(
                     agente=agente,
@@ -143,7 +145,7 @@ def ask_claude(
                 )
                 raise
 
-    raise RuntimeError("Falha após 3 tentativas")
+    raise RuntimeError("Falha Gemini após 3 tentativas")
 
 
 def ask_claude_json(
@@ -152,16 +154,36 @@ def ask_claude_json(
     max_tokens: int = 2048,
     agente: str = "geral",
     pncp_id: str | None = None,
+    fallback_on_quota: bool = True,
 ) -> dict:
-    """Chamada ao LLM que espera resposta JSON."""
+    """Chamada ao LLM que espera resposta JSON.
+
+    Se Gemini retornar quota 429 e fallback_on_quota=True, retorna
+    {"_needs_manual_review": True, "_reason": "..."} em vez de crashar.
+    O pipeline segue funcionando; o dashboard mostra "precisa revisão".
+    """
     for attempt in range(2):
-        text = ask_claude(
-            system=system,
-            user=user,
-            max_tokens=max_tokens,
-            agente=agente,
-            pncp_id=pncp_id,
-        )
+        try:
+            text = ask_claude(
+                system=system,
+                user=user,
+                max_tokens=max_tokens,
+                agente=agente,
+                pncp_id=pncp_id,
+            )
+        except Exception as e:
+            # Gemini quota 429, API desativada, timeout — graceful degradation
+            msg = str(e).lower()
+            is_quota = any(x in msg for x in ["429", "quota", "desativada", "rate limit", "exceeded"])
+            if fallback_on_quota and is_quota:
+                log.warning(f"Gemini indisponivel [{agente}]: marcando edital para revisao manual")
+                return {
+                    "_needs_manual_review": True,
+                    "_reason": f"Gemini indisponivel: {str(e)[:100]}",
+                    "_agente": agente,
+                    "_pncp_id": pncp_id,
+                }
+            raise
 
         cleaned = text.strip()
         if cleaned.startswith("```"):
@@ -173,11 +195,18 @@ def ask_claude_json(
             return json.loads(cleaned)
         except json.JSONDecodeError:
             if attempt == 0:
-                log.warning("JSON inválido. Retentando...")
-                system += "\n\nIMPORTANTE: Retorne SOMENTE JSON válido. Sem texto antes ou depois."
+                log.warning("JSON invalido. Retentando...")
+                system += "\n\nIMPORTANTE: Retorne SOMENTE JSON valido."
             else:
-                log.error(f"JSON inválido após 2 tentativas: {text[:200]}")
-                raise ValueError(f"LLM retornou JSON inválido: {text[:200]}")
+                log.error(f"JSON invalido apos 2 tentativas: {text[:200]}")
+                return {
+                    "_needs_manual_review": True,
+                    "_reason": f"LLM retornou JSON invalido: {text[:100]}",
+                    "_agente": agente,
+                    "_pncp_id": pncp_id,
+                }
+
+    # fim da funcao
 
 
 # ── Versões async ──────────────────────

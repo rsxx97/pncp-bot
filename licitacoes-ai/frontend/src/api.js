@@ -1,10 +1,21 @@
 const BASE = '';
 
+function _authHeaders() {
+  const token = localStorage.getItem('token');
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
+
 async function request(url, options = {}) {
   const resp = await fetch(BASE + url, {
-    headers: { 'Content-Type': 'application/json', ...options.headers },
+    headers: { 'Content-Type': 'application/json', ..._authHeaders(), ...options.headers },
     ...options,
   });
+  if (resp.status === 401) {
+    localStorage.removeItem('token');
+    localStorage.removeItem('tenant');
+    window.location.reload();
+    throw new Error('Sessão expirada');
+  }
   if (!resp.ok) throw new Error(`API ${resp.status}: ${resp.statusText}`);
   return resp.json();
 }
@@ -67,4 +78,16 @@ export const api = {
 
   // Config
   getConfig: () => request('/api/config'),
+
+  // Auth
+  login: (email, senha) => request('/api/auth/login', { method: 'POST', body: JSON.stringify({ email, senha }) }),
+  register: (data) => request('/api/auth/register', { method: 'POST', body: JSON.stringify(data) }),
+  me: () => request('/api/auth/me'),
+  trocarSenha: (senha_atual, senha_nova) => request('/api/auth/senha', { method: 'POST', body: JSON.stringify({ senha_atual, senha_nova }) }),
+
+  // Admin
+  listarPendentes: () => request('/api/auth/pendentes'),
+  listarTenants: () => request('/api/auth/tenants'),
+  aprovarTenant: (id) => request(`/api/auth/aprovar/${id}`, { method: 'POST' }),
+  rejeitarTenant: (id) => request(`/api/auth/rejeitar/${id}`, { method: 'POST' }),
 };

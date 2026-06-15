@@ -245,8 +245,6 @@ def _analisar_tr_pdf(tr_path: Path, analise_edital: dict, pncp_id: str) -> dict:
     - Jornadas de trabalho detalhadas
     - Modelo de planilha de custos
     """
-    from shared.llm_client import ask_claude_json
-
     result = extract_smart(tr_path)
     texto_tr = result["text"]
     log.info(f"TR: {result['pages']} pgs, {len(texto_tr)} chars")
@@ -314,16 +312,12 @@ DADOS JÁ EXTRAÍDOS DAS TABELAS DO PDF (use como referência/validação):
 TERMO DE REFERÊNCIA:
 {_preparar_texto_tr(texto_tr)}"""
 
+    # Código puro — usa regex extractor em vez de LLM
     try:
-        tr_dados = ask_claude_json(
-            system="Você é um especialista em precificação de licitações. Extraia dados para montar planilha de custos IN 05/2017. Se dados de tabela foram fornecidos, VALIDE e COMPLEMENTE com informações do texto (jornada, adicionais, CCT).",
-            user=prompt_tr,
-            max_tokens=4096,
-            agente="analista_tr",
-            pncp_id=pncp_id,
-        )
+        from agente2_analista.edital_parser import extrair_dados_estruturados
+        tr_dados = extrair_dados_estruturados(texto_tr or "", pncp_id=pncp_id)
     except Exception as e:
-        log.warning(f"Erro na análise LLM do TR: {e}")
+        log.warning(f"Erro na extracao regex do TR: {e}")
         tr_dados = {}
 
     # Postos da tabela têm prioridade (mais precisos)

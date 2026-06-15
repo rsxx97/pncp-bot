@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import IntegracoesEmpresa from "./IntegracoesEmpresa";
 
 const REGIMES = [
   { value: "lucro_real", label: "Lucro Real" },
@@ -163,6 +164,7 @@ export default function Perfil({ token, tenant, onUpdate }) {
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState(null);
+  const [integrandoEmpresa, setIntegrandoEmpresa] = useState(null);
 
   const headers = { Authorization: `Bearer ${token}`, "Content-Type": "application/json" };
 
@@ -237,12 +239,21 @@ export default function Perfil({ token, tenant, onUpdate }) {
                   </div>
                 </div>
                 <div style={{ display: "flex", gap: 6 }}>
+                  <button onClick={() => setIntegrandoEmpresa(integrandoEmpresa === emp.id ? null : emp.id)}
+                    style={{ padding: "4px 12px", background: integrandoEmpresa === emp.id ? "#1A1A18" : "#EFF6FF", color: integrandoEmpresa === emp.id ? "#FFF" : "#2563EB", border: "none", borderRadius: 6, fontSize: 12, cursor: "pointer", fontWeight: 600 }}>
+                    {integrandoEmpresa === emp.id ? "Fechar" : "Integrações"}
+                  </button>
                   <button onClick={() => { setEditing(emp); setShowForm(true); }}
                     style={{ padding: "4px 12px", background: "#F3F4F6", border: "none", borderRadius: 6, fontSize: 12, cursor: "pointer" }}>Editar</button>
                   <button onClick={() => handleDelete(emp.id)}
                     style={{ padding: "4px 12px", background: "#FEF2F2", border: "none", borderRadius: 6, fontSize: 12, cursor: "pointer", color: "#DC2626" }}>Remover</button>
                 </div>
               </div>
+              {integrandoEmpresa === emp.id && (
+                <div style={{ marginTop: 16, paddingTop: 16, borderTop: "1px solid #E5E7EB" }}>
+                  <IntegracoesEmpresa empresaId={emp.id} empresaNome={emp.nome} />
+                </div>
+              )}
             </div>
           ))}
           {empresas.length === 0 && !showForm && (
