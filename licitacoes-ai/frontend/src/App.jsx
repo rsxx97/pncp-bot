@@ -13,6 +13,7 @@ import Login from "./components/Login";
 import Landing from "./components/Landing";
 import AdminPanel from "./components/AdminPanel";
 import EmailConfirmBanner from "./components/EmailConfirmBanner";
+import Onboarding from "./components/Onboarding";
 import RadarRoot from "./radar/RadarRoot";
 
 function pathToProduto(path) {
@@ -75,7 +76,11 @@ function MainApp() {
   if (loading) {
     return <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", color: "#999" }}>Carregando…</div>;
   }
-  if (tenant) return <PageRouter />;
+  if (tenant) {
+    // Cliente novo que ainda não disse o que a empresa faz → onboarding primeiro
+    if (tenant.role !== "super_admin" && !tenant.onboarding_done) return <Onboarding />;
+    return <PageRouter />;
+  }
   if (showLogin) return <Login onLogin={(t, tok) => login(t, tok)} />;
   return <Landing onStart={() => setShowLogin(true)} />;
 }

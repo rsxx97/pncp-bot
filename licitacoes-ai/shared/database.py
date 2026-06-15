@@ -323,6 +323,16 @@ def _aplicar_migrations(conn):
     if not _coluna_existe(conn, "tenants", "token_verificacao"):
         conn.execute("ALTER TABLE tenants ADD COLUMN token_verificacao TEXT")
 
+    # Onboarding: tipo de negócio do cliente (define campos + matching de editais)
+    if not _coluna_existe(conn, "tenants", "tipo_negocio"):
+        conn.execute("ALTER TABLE tenants ADD COLUMN tipo_negocio TEXT")  # mao_obra | obras | aquisicao
+    if not _coluna_existe(conn, "tenants", "onboarding_nichos"):
+        conn.execute("ALTER TABLE tenants ADD COLUMN onboarding_nichos TEXT")  # JSON list
+    if not _coluna_existe(conn, "tenants", "onboarding_ufs"):
+        conn.execute("ALTER TABLE tenants ADD COLUMN onboarding_ufs TEXT")  # JSON list
+    if not _coluna_existe(conn, "tenants", "onboarding_done"):
+        conn.execute("ALTER TABLE tenants ADD COLUMN onboarding_done INTEGER DEFAULT 0")
+
     conn.executescript(_RADAR_SCHEMA_SQL)
 
     # Migrations pós-schema (após CREATE TABLE IF NOT EXISTS dos schemas radar)

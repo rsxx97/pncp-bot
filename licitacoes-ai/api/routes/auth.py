@@ -226,6 +226,8 @@ def me(tenant: dict = Depends(require_tenant)):
         "role": tenant.get("role", "tenant_admin"),
         "senha_temporaria": bool(tenant.get("senha_temporaria", 0)),
         "email_verificado": bool(tenant.get("email_verificado", 0)),
+        "onboarding_done": bool(tenant.get("onboarding_done", 0)),
+        "tipo_negocio": tenant.get("tipo_negocio"),
         "empresas": [
             {
                 "id": e["id"],

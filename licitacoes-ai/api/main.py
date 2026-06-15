@@ -16,6 +16,7 @@ from api.routes import (
     dashboard, editais, concorrentes, config, auth, perfil, perfil_integracoes,
     pregoes, lances_robot, alertas, planilhas, habilitacao,
     radar, radar_alertas, radar_historico, radar_sse, radar_metrics,
+    onboarding,
 )
 
 log = logging.getLogger("api")
@@ -40,6 +41,7 @@ app.include_router(config.router)
 app.include_router(auth.router)
 app.include_router(perfil.router)
 app.include_router(perfil_integracoes.router)
+app.include_router(onboarding.router)
 app.include_router(radar.router)
 app.include_router(radar_alertas.router)
 app.include_router(radar_historico.router)
