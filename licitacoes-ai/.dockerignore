@@ -8,6 +8,22 @@ _backup_pre_deploy/
 *.bak
 *.backup
 
+# Segredos (NUNCA na imagem)
+config/google_sa.json
+config/*_sa.json
+
+# Downloads pesados de editais/propostas (300MB+, nao sao codigo)
+bot_pncp_skills/
+data/editais/
+data/screenshots/
+data/habilitacao/
+data/ccts/
+data/keeping_export.txt
+
+# Scripts de debug locais
+_check*.py
+_force_tick.py
+
 # DB local — vamos subir SEPARADO pro volume Railway
 data/licitacoes.db
 data/licitacoes.db-shm

@@ -13,11 +13,11 @@ def get_connection():
 
 
 def tenant_filter_sql(tenant: dict | None) -> tuple[str, list]:
-    """Cláusula WHERE para filtrar por tenant.
+    """Cláusula WHERE para filtrar por tenant (SaaS — isolamento estrito).
 
-    - Sem auth ou super_admin: sem filtro
-    - Tenant comum: editais do próprio tenant + globais (tenant_id NULL)
+    - Sem auth ou super_admin (operador): vê tudo
+    - Tenant comum (cliente): SÓ os editais do próprio tenant. Nada compartilhado.
     """
     if not tenant or tenant.get("role") == "super_admin":
         return "1=1", []
-    return "(tenant_id = ? OR tenant_id IS NULL)", [tenant["id"]]
+    return "tenant_id = ?", [tenant["id"]]
