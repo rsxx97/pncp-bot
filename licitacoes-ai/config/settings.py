@@ -29,6 +29,11 @@ JWT_SECRET = os.getenv("JWT_SECRET", "dev-only-secret-change-in-production")
 JWT_ALGORITHM = "HS256"
 JWT_EXPIRE_HOURS = int(os.getenv("JWT_EXPIRE_HOURS", "168"))  # 7 dias
 
+# E-mail transacional (Resend)
+RESEND_API_KEY = os.getenv("RESEND_API_KEY")
+RESEND_FROM = os.getenv("RESEND_FROM", "onboarding@resend.dev")
+APP_BASE_URL = os.getenv("APP_BASE_URL", "http://localhost:8000").rstrip("/")
+
 # Configurações de negócio
 ESTADO_FOCO = os.getenv("ESTADO_FOCO", "RJ")
 # Lista de UFs monitoradas. Aceita "RJ", "RJ,SC", etc. Default: RJ + SC (obras/reforma).

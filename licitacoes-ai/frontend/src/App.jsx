@@ -12,6 +12,7 @@ import HabilitacaoPage from "./components/HabilitacaoPage";
 import Login from "./components/Login";
 import Landing from "./components/Landing";
 import AdminPanel from "./components/AdminPanel";
+import EmailConfirmBanner from "./components/EmailConfirmBanner";
 import RadarRoot from "./radar/RadarRoot";
 
 function pathToProduto(path) {
@@ -56,6 +57,7 @@ function PageRouter() {
 
   return (
     <AppLayout produto={produto} titulo={cfg.tit} subtitulo={cfg.sub}>
+      <EmailConfirmBanner tenant={tenant} />
       {cfg.comp}
     </AppLayout>
   );

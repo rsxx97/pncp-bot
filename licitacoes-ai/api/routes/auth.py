@@ -1,6 +1,8 @@
 """Autenticação SaaS — bcrypt + JWT + RBAC (super_admin / tenant_admin)."""
 from datetime import datetime, timedelta, timezone
+import secrets
 from fastapi import APIRouter, HTTPException, Depends, Header
+from fastapi.responses import HTMLResponse
 from pydantic import BaseModel, EmailStr
 import bcrypt
 import jwt
@@ -9,7 +11,19 @@ import sys
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
-from config.settings import JWT_SECRET, JWT_ALGORITHM, JWT_EXPIRE_HOURS
+from config.settings import JWT_SECRET, JWT_ALGORITHM, JWT_EXPIRE_HOURS, APP_BASE_URL
+
+
+def _enviar_confirmacao(tenant_id: int, email: str, nome: str):
+    """Gera token de verificação, salva e dispara o e-mail. Não levanta exceção."""
+    from shared.database import get_db
+    from shared.email_resend import enviar_confirmacao
+    token_verif = secrets.token_urlsafe(32)
+    conn = get_db()
+    conn.execute("UPDATE tenants SET token_verificacao = ? WHERE id = ?", (token_verif, tenant_id))
+    conn.commit()
+    link = f"{APP_BASE_URL}/api/auth/confirmar?token={token_verif}"
+    return enviar_confirmacao(email, nome, link)
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
@@ -95,7 +109,7 @@ class TrocarSenhaRequest(BaseModel):
 
 @router.post("/register")
 def register(body: RegisterRequest):
-    from shared.database import criar_tenant, get_tenant_by_email
+    from shared.database import criar_tenant, get_tenant_by_email, get_tenant
 
     if get_tenant_by_email(body.email):
         raise HTTPException(409, "Email já cadastrado")
@@ -103,15 +117,34 @@ def register(body: RegisterRequest):
     if len(body.senha) < 6:
         raise HTTPException(400, "Senha precisa ter ao menos 6 caracteres")
 
-    criar_tenant(
+    # Cadastro self-service: cria já aprovado e ativo, e devolve o token (login automático)
+    tenant_id = criar_tenant(
         nome_empresa=body.nome_empresa,
         email=body.email,
         senha_hash=_hash_senha(body.senha),
         cnpj=body.cnpj,
+        aprovado=1,
     )
+
+    # Dispara o e-mail de confirmação (não bloqueia o cadastro se falhar)
+    _enviar_confirmacao(tenant_id, body.email, body.nome_empresa)
+
+    tenant = get_tenant(tenant_id) or {}
+    role = tenant.get("role", "tenant_admin")
+    token = _gerar_token(tenant_id, role)
     return {
-        "message": "Cadastro realizado. Aguarde aprovação do administrador.",
-        "pendente": True,
+        "token": token,
+        "tenant": {
+            "id": tenant_id,
+            "nome_empresa": body.nome_empresa,
+            "email": body.email,
+            "plano": tenant.get("plano", "free"),
+            "plano_radar_limite": tenant.get("plano_radar_limite", 50),
+            "role": role,
+            "senha_temporaria": False,
+            "email_verificado": False,
+        },
+        "novo": True,
     }
 
 
@@ -140,8 +173,30 @@ def login(body: LoginRequest):
             "plano_radar_limite": tenant.get("plano_radar_limite", 50),
             "role": tenant.get("role", "tenant_admin"),
             "senha_temporaria": bool(tenant.get("senha_temporaria", 0)),
+            "email_verificado": bool(tenant.get("email_verificado", 0)),
         },
     }
+
+
+@router.get("/confirmar", response_class=HTMLResponse)
+def confirmar(token: str):
+    from shared.database import get_db
+    from shared.email_resend import pagina_confirmacao_html
+    conn = get_db()
+    row = conn.execute("SELECT id, nome_empresa FROM tenants WHERE token_verificacao = ?", (token,)).fetchone()
+    if not row:
+        return HTMLResponse(pagina_confirmacao_html(ok=False), status_code=400)
+    conn.execute("UPDATE tenants SET email_verificado = 1, token_verificacao = NULL WHERE id = ?", (row["id"],))
+    conn.commit()
+    return HTMLResponse(pagina_confirmacao_html(ok=True, nome=row["nome_empresa"]))
+
+
+@router.post("/reenviar")
+def reenviar_confirmacao(tenant: dict = Depends(require_tenant)):
+    if tenant.get("email_verificado"):
+        return {"ok": True, "ja_confirmado": True}
+    enviado = _enviar_confirmacao(tenant["id"], tenant["email"], tenant["nome_empresa"])
+    return {"ok": bool(enviado), "email": tenant["email"]}
 
 
 @router.post("/senha")
@@ -170,6 +225,7 @@ def me(tenant: dict = Depends(require_tenant)):
         "plano_radar_limite": tenant.get("plano_radar_limite", 50),
         "role": tenant.get("role", "tenant_admin"),
         "senha_temporaria": bool(tenant.get("senha_temporaria", 0)),
+        "email_verificado": bool(tenant.get("email_verificado", 0)),
         "empresas": [
             {
                 "id": e["id"],

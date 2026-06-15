@@ -317,6 +317,12 @@ def _aplicar_migrations(conn):
     if not _coluna_existe(conn, "tenants", "plano_radar_limite"):
         conn.execute("ALTER TABLE tenants ADD COLUMN plano_radar_limite INTEGER DEFAULT 50")
 
+    # Confirmação de e-mail (cadastro self-service)
+    if not _coluna_existe(conn, "tenants", "email_verificado"):
+        conn.execute("ALTER TABLE tenants ADD COLUMN email_verificado INTEGER DEFAULT 0")
+    if not _coluna_existe(conn, "tenants", "token_verificacao"):
+        conn.execute("ALTER TABLE tenants ADD COLUMN token_verificacao TEXT")
+
     conn.executescript(_RADAR_SCHEMA_SQL)
 
     # Migrations pós-schema (após CREATE TABLE IF NOT EXISTS dos schemas radar)
