@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
+import { api } from "../api";
 
 const C = {
   bg: "#09090B", s1: "#111114", s2: "#18181C", s3: "#222228",
@@ -42,7 +43,7 @@ export default function HabilitacaoPage() {
     Promise.all([
       fetch("/api/habilitacao/empresas").then(r => r.json()),
       fetch("/api/habilitacao/tipos").then(r => r.json()),
-      fetch("/api/editais?per_page=500&sort=-valor_estimado").then(r => r.json()),
+      api.getEditais({ per_page: 500, sort: "-valor_estimado" }),  // via api = manda token = isola por cliente
     ]).then(([emp, tip, ed]) => {
       setEmpresas(emp);
       setTiposDisponiveis(tip);
@@ -61,6 +62,14 @@ export default function HabilitacaoPage() {
       (e.pncp_id || "").toLowerCase().includes(s)
     );
   }, [editais, busca]);
+
+  const retirar = async (pncp_id) => {
+    if (!window.confirm("Retirar este edital da sua lista?")) return;
+    try {
+      await api.arquivar(pncp_id);
+      setEditais(eds => eds.filter(e => e.pncp_id !== pncp_id));
+    } catch (e) { console.error(e); }
+  };
 
   const gerar = async (pncp_id) => {
     setGerando(g => ({ ...g, [pncp_id]: true }));
@@ -207,7 +216,7 @@ export default function HabilitacaoPage() {
           <table style={{ width: "100%", borderCollapse: "collapse", fontFamily: mono, fontSize: 11 }}>
             <thead>
               <tr style={{ borderBottom: `1px solid ${C.b1}` }}>
-                {["Órgão / Objeto", "Valor", "UF", "Status", "Pacote"].map((h, i) => (
+                {["Órgão / Objeto", "Valor", "UF", "Status", "Pacote", ""].map((h, i) => (
                   <th key={i} style={{ padding: "10px 8px", textAlign: "left", color: C.t3, fontWeight: 600, fontSize: 9, textTransform: "uppercase", letterSpacing: 0.8 }}>{h}</th>
                 ))}
               </tr>
@@ -242,6 +251,14 @@ export default function HabilitacaoPage() {
                         {gerando[e.pncp_id] ? "Gerando..." : "Gerar"}
                       </button>
                     )}
+                  </td>
+                  <td style={{ padding: "10px 8px" }}>
+                    <button onClick={() => retirar(e.pncp_id)} title="Retirar da minha lista"
+                      style={{ fontFamily: mono, fontSize: 10, padding: "5px 10px", borderRadius: 4,
+                        border: `1px solid ${C.rd}33`, background: "transparent", color: C.rd,
+                        cursor: "pointer", fontWeight: 600, whiteSpace: "nowrap" }}>
+                      Retirar
+                    </button>
                   </td>
                 </tr>
               ))}

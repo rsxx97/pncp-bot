@@ -708,10 +708,11 @@ def resetar_edital(pncp_id: str):
 
 
 @router.delete("/{pncp_id:path}/excluir")
-def excluir_edital(pncp_id: str):
-    """Exclui edital do pipeline."""
+def excluir_edital(pncp_id: str, tenant: dict = Depends(get_current_tenant)):
+    """Exclui edital do pipeline (só do próprio tenant)."""
     conn = get_connection()
-    conn.execute("DELETE FROM editais WHERE pncp_id = ?", (pncp_id,))
+    t_sql, t_params = tenant_filter_sql(tenant)
+    conn.execute(f"DELETE FROM editais WHERE pncp_id = ? AND {t_sql}", (pncp_id, *t_params))
     conn.commit()
     return {"ok": True}
 
@@ -868,11 +869,12 @@ def competitivo(pncp_id: str):
 
 
 @router.post("/{pncp_id:path}/arquivar")
-def arquivar_edital(pncp_id: str):
+def arquivar_edital(pncp_id: str, tenant: dict = Depends(get_current_tenant)):
     conn = get_connection()
+    t_sql, t_params = tenant_filter_sql(tenant)
     conn.execute(
-        "UPDATE editais SET status = 'arquivado', updated_at = datetime('now') WHERE pncp_id = ?",
-        (pncp_id,),
+        f"UPDATE editais SET status = 'arquivado', updated_at = datetime('now') WHERE pncp_id = ? AND {t_sql}",
+        (pncp_id, *t_params),
     )
     conn.commit()
     return {"ok": True, "status": "arquivado"}
