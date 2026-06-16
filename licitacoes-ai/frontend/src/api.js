@@ -21,9 +21,16 @@ async function request(url, options = {}) {
 }
 
 export const api = {
-  // Dashboard
-  getMetrics: () => request('/api/dashboard/metrics'),
+  // Dashboard (todos com token → isolados por empresa)
+  getMetrics: (period = '90d') => request(`/api/dashboard/metrics?period=${period}`),
   getWeeklyChart: () => request('/api/dashboard/weekly-chart'),
+  getFunnel: (period = '90d') => request(`/api/dashboard/funnel?period=${period}`),
+  getVolumeByStatus: (period = '90d') => request(`/api/dashboard/volume-by-status?period=${period}`),
+  getAlerts: () => request('/api/dashboard/alerts'),
+  getCompetitorsRanking: () => request('/api/dashboard/competitors-ranking'),
+  getHeatmap: () => request('/api/dashboard/heatmap'),
+  getCalendar: () => request('/api/dashboard/calendar'),
+  getSparkline: (metric, days = 14) => request(`/api/dashboard/sparkline/${metric}?days=${days}`),
 
   // Editais
   getEditais: (params = {}) => {

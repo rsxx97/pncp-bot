@@ -1,11 +1,21 @@
 """Rotas de métricas do dashboard — design premium."""
 from datetime import datetime, date, timedelta
-from fastapi import APIRouter, Query, Depends
+from fastapi import APIRouter, Query, Depends, HTTPException
 
 from api.deps import get_connection, tenant_filter_sql
 from api.routes.auth import get_current_tenant
 
 router = APIRouter(prefix="/api/dashboard", tags=["dashboard"])
+
+
+def require_tenant(tenant: dict | None = Depends(get_current_tenant)) -> dict:
+    """Exige login. Sem token válido → 401 (nunca cai no fallback 1=1 que vê tudo).
+
+    SaaS multi-tenant: cada empresa abre zerada e só vê os próprios dados.
+    """
+    if tenant is None:
+        raise HTTPException(401, "Autenticação necessária")
+    return tenant
 
 
 def _period_filter(period: str) -> str:
@@ -37,7 +47,7 @@ def _is_monitor_active(monitor) -> bool:
 
 
 @router.get("/metrics")
-def get_metrics(period: str = Query("90d"), tenant: dict = Depends(get_current_tenant)):
+def get_metrics(period: str = Query("90d"), tenant: dict = Depends(require_tenant)):
     conn = get_connection()
     pf = _period_filter(period)
     hoje = date.today().isoformat()
@@ -83,12 +93,15 @@ def get_metrics(period: str = Query("90d"), tenant: dict = Depends(get_current_t
 
 
 @router.get("/funnel")
-def get_funnel(period: str = Query("90d")):
+def get_funnel(period: str = Query("90d"), tenant: dict = Depends(require_tenant)):
     conn = get_connection()
     pf = _period_filter(period)
-    def cnt(where): return conn.execute(f"SELECT COUNT(*) as c FROM editais WHERE {where} {pf}").fetchone()["c"]
+    t_sql, t_params = tenant_filter_sql(tenant)
+    def cnt(extra=None):
+        where = t_sql + (f" AND {extra}" if extra else "")
+        return conn.execute(f"SELECT COUNT(*) as c FROM editais WHERE {where} {pf}", t_params).fetchone()["c"]
 
-    monitorados = cnt("1=1")
+    monitorados = cnt()
     score_60 = cnt("score_relevancia >= 60")
     analisados = cnt("status NOT IN ('novo','classificado','analisando','arquivado','erro_analise')")
     go = cnt("parecer LIKE 'go%'")
@@ -123,14 +136,15 @@ def executar_monitor_manual(dias: int = 10):
 
 
 @router.get("/volume-by-status")
-def get_volume_by_status(period: str = Query("90d")):
+def get_volume_by_status(period: str = Query("90d"), tenant: dict = Depends(require_tenant)):
     conn = get_connection()
     pf = _period_filter(period)
+    t_sql, t_params = tenant_filter_sql(tenant)
     rows = conn.execute(f"""
         SELECT status, COALESCE(SUM(valor_estimado),0) as vol
-        FROM editais WHERE 1=1 {pf}
+        FROM editais WHERE {t_sql} {pf}
         GROUP BY status
-    """).fetchall()
+    """, t_params).fetchall()
 
     result = {}
     total = 0
@@ -146,16 +160,17 @@ def get_volume_by_status(period: str = Query("90d")):
 
 
 @router.get("/alerts")
-def get_alerts():
+def get_alerts(tenant: dict = Depends(require_tenant)):
     conn = get_connection()
     now = datetime.now()
-    rows = conn.execute("""
+    t_sql, t_params = tenant_filter_sql(tenant)
+    rows = conn.execute(f"""
         SELECT pncp_id, orgao_nome, objeto, data_abertura, status, planilha_path
         FROM editais
-        WHERE data_abertura IS NOT NULL AND status NOT IN ('arquivado','venceu','participou')
+        WHERE {t_sql} AND data_abertura IS NOT NULL AND status NOT IN ('arquivado','venceu','participou')
         ORDER BY data_abertura ASC
         LIMIT 20
-    """).fetchall()
+    """, t_params).fetchall()
 
     alerts = []
     for r in rows:
@@ -190,17 +205,18 @@ def get_alerts():
 
 
 @router.get("/sparkline/{metric}")
-def get_sparkline(metric: str, days: int = Query(14)):
+def get_sparkline(metric: str, days: int = Query(14), tenant: dict = Depends(require_tenant)):
     conn = get_connection()
+    t_sql, t_params = tenant_filter_sql(tenant)
     result = []
     for i in range(days - 1, -1, -1):
         d = (date.today() - timedelta(days=i)).isoformat()
         if metric == "editais":
-            v = conn.execute("SELECT COUNT(*) as c FROM editais WHERE DATE(created_at) = ?", (d,)).fetchone()["c"]
+            v = conn.execute(f"SELECT COUNT(*) as c FROM editais WHERE {t_sql} AND DATE(created_at) = ?", t_params + [d]).fetchone()["c"]
         elif metric == "pipeline_valor":
-            v = conn.execute("SELECT COALESCE(SUM(valor_estimado),0) as c FROM editais WHERE DATE(created_at) <= ? AND status != 'arquivado'", (d,)).fetchone()["c"]
+            v = conn.execute(f"SELECT COALESCE(SUM(valor_estimado),0) as c FROM editais WHERE {t_sql} AND DATE(created_at) <= ? AND status != 'arquivado'", t_params + [d]).fetchone()["c"]
         elif metric == "score_medio":
-            v = conn.execute("SELECT COALESCE(AVG(score_relevancia),0) as c FROM editais WHERE DATE(created_at) = ?", (d,)).fetchone()["c"]
+            v = conn.execute(f"SELECT COALESCE(AVG(score_relevancia),0) as c FROM editais WHERE {t_sql} AND DATE(created_at) = ?", t_params + [d]).fetchone()["c"]
         elif metric == "custo_api":
             v = conn.execute("SELECT COALESCE(SUM(custo_estimado),0) as c FROM execucoes WHERE DATE(created_at) = ?", (d,)).fetchone()["c"]
         else:
@@ -210,7 +226,7 @@ def get_sparkline(metric: str, days: int = Query(14)):
 
 
 @router.get("/competitors-ranking")
-def get_competitors_ranking():
+def get_competitors_ranking(tenant: dict = Depends(require_tenant)):
     import json
     from pathlib import Path
     config_path = Path(__file__).parent.parent.parent / "config" / "concorrentes.json"
@@ -240,7 +256,7 @@ def get_competitors_ranking():
 
 
 @router.get("/heatmap")
-def get_heatmap():
+def get_heatmap(tenant: dict = Depends(require_tenant)):
     import json
     from pathlib import Path
     config_path = Path(__file__).parent.parent.parent / "config" / "concorrentes.json"
@@ -262,17 +278,18 @@ def get_heatmap():
 
 
 @router.get("/calendar")
-def get_calendar(month: str = Query(None)):
+def get_calendar(month: str = Query(None), tenant: dict = Depends(require_tenant)):
     conn = get_connection()
     if not month:
         month = date.today().strftime("%Y-%m")
 
-    rows = conn.execute("""
+    t_sql, t_params = tenant_filter_sql(tenant)
+    rows = conn.execute(f"""
         SELECT pncp_id, orgao_nome, valor_estimado, data_abertura, status
         FROM editais
-        WHERE data_abertura IS NOT NULL AND data_abertura LIKE ?
+        WHERE {t_sql} AND data_abertura IS NOT NULL AND data_abertura LIKE ?
         ORDER BY data_abertura
-    """, (f"{month}%",)).fetchall()
+    """, t_params + [f"{month}%"]).fetchall()
 
     days = {}
     now = datetime.now()
@@ -300,9 +317,10 @@ def get_calendar(month: str = Query(None)):
 
 
 @router.get("/weekly-chart")
-def get_weekly_chart():
+def get_weekly_chart(tenant: dict = Depends(require_tenant)):
     conn = get_connection()
-    rows = conn.execute("""
+    t_sql, t_params = tenant_filter_sql(tenant)
+    rows = conn.execute(f"""
         SELECT
             strftime('%W', created_at) as semana,
             strftime('%d', MIN(created_at)) || ' ' ||
@@ -315,8 +333,8 @@ def get_weekly_chart():
             SUM(CASE WHEN score_relevancia >= 60 THEN 1 ELSE 0 END) as score60,
             SUM(CASE WHEN score_relevancia < 60 OR score_relevancia IS NULL THEN 1 ELSE 0 END) as abaixo
         FROM editais
-        WHERE created_at >= datetime('now', '-28 days')
+        WHERE {t_sql} AND created_at >= datetime('now', '-28 days')
         GROUP BY strftime('%W', created_at)
         ORDER BY semana ASC
-    """).fetchall()
+    """, t_params).fetchall()
     return [dict(r) for r in rows]

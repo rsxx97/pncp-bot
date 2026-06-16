@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import { api } from "../api";
 
 const C = {
   bg: "#09090B", s1: "#111114", s2: "#18181C", s3: "#222228",
@@ -354,15 +355,15 @@ export default function KPIDashboard({ period, onPeriodChange }) {
   const load = () => {
     const p = period || "90d";
     setApiError(false);
-    fetch(`/api/dashboard/metrics?period=${p}`).then(r => { if (!r.ok) throw r; return r.json(); }).then(setMetrics).catch(() => setApiError(true));
-    fetch(`/api/dashboard/funnel?period=${p}`).then(r => r.json()).then(setFunnel).catch(() => {});
-    fetch(`/api/dashboard/volume-by-status?period=${p}`).then(r => r.json()).then(setVolume).catch(() => {});
-    fetch("/api/dashboard/alerts").then(r => r.json()).then(setAlerts).catch(() => {});
-    fetch("/api/dashboard/competitors-ranking").then(r => r.json()).then(setRanking).catch(() => {});
-    fetch("/api/dashboard/heatmap").then(r => r.json()).then(setHeatmap).catch(() => {});
-    fetch("/api/dashboard/calendar").then(r => r.json()).then(setCalendar).catch(() => {});
-    fetch("/api/dashboard/sparkline/editais?days=14").then(r => r.json()).then(setSparkEditais).catch(() => {});
-    fetch("/api/dashboard/sparkline/pipeline_valor?days=14").then(r => r.json()).then(setSparkPipeline).catch(() => {});
+    api.getMetrics(p).then(setMetrics).catch(() => setApiError(true));
+    api.getFunnel(p).then(setFunnel).catch(() => {});
+    api.getVolumeByStatus(p).then(setVolume).catch(() => {});
+    api.getAlerts().then(setAlerts).catch(() => {});
+    api.getCompetitorsRanking().then(setRanking).catch(() => {});
+    api.getHeatmap().then(setHeatmap).catch(() => {});
+    api.getCalendar().then(setCalendar).catch(() => {});
+    api.getSparkline("editais", 14).then(setSparkEditais).catch(() => {});
+    api.getSparkline("pipeline_valor", 14).then(setSparkPipeline).catch(() => {});
   };
 
   useEffect(load, [period]);
