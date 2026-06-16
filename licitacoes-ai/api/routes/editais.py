@@ -8,7 +8,7 @@ from fastapi.responses import FileResponse
 from pydantic import BaseModel
 
 from api.deps import get_connection, tenant_filter_sql
-from api.routes.auth import get_current_tenant
+from api.routes.auth import get_current_tenant, require_tenant
 from fastapi import Depends
 
 
@@ -307,7 +307,7 @@ def listar_editais(
     sort: str = Query("-score_relevancia"),
     busca: str = Query(None),
     abertas: bool = Query(False),
-    tenant: dict = Depends(get_current_tenant),
+    tenant: dict = Depends(require_tenant),
 ):
     conn = get_connection()
     where = []

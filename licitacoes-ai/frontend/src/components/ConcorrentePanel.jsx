@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { authHeaders } from "../api";
 
 const C = {
   bg: "#09090B", s1: "#111114", s2: "#18181C", s3: "#222228",
@@ -30,7 +31,7 @@ function BuscarPncpModal({ onClose, onImport }) {
     if (termo.length < 3) return;
     setLoading(true); setError(""); setResults([]);
     try {
-      const resp = await fetch(`/api/concorrentes/buscar-pncp?termo=${encodeURIComponent(termo)}&uf=${uf}`);
+      const resp = await fetch(`/api/concorrentes/buscar-pncp?termo=${encodeURIComponent(termo)}&uf=${uf}`, { headers: authHeaders() });
       const data = await resp.json();
       setResults(data.items || []);
       if (data.nota) setError(data.nota);
@@ -130,7 +131,7 @@ export default function ConcorrentePanel() {
   const load = async () => {
     setLoading(true); setError("");
     try {
-      const resp = await fetch("/api/concorrentes");
+      const resp = await fetch("/api/concorrentes", { headers: authHeaders() });
       if (!resp.ok) throw new Error(`${resp.status}`);
       setConcorrentes(await resp.json());
     } catch (e) {
@@ -145,7 +146,7 @@ export default function ConcorrentePanel() {
     try {
       await fetch("/api/concorrentes", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: authHeaders({ "Content-Type": "application/json" }),
         body: JSON.stringify({ cnpj: item.cnpj, razao_social: item.razao_social, nome_fantasia: "", segmentos: [], notas: `Importado do PNCP — ${item.participacoes} participações encontradas` }),
       });
       setShowSearch(false);
@@ -157,7 +158,7 @@ export default function ConcorrentePanel() {
     try {
       await fetch("/api/concorrentes", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: authHeaders({ "Content-Type": "application/json" }),
         body: JSON.stringify(data),
       });
       setShowAdd(false);
@@ -168,7 +169,7 @@ export default function ConcorrentePanel() {
   const handleRemove = async (cnpj) => {
     if (!confirm("Remover este concorrente?")) return;
     try {
-      await fetch(`/api/concorrentes/${encodeURIComponent(cnpj)}`, { method: "DELETE" });
+      await fetch(`/api/concorrentes/${encodeURIComponent(cnpj)}`, { method: "DELETE", headers: authHeaders() });
       load();
     } catch (e) { console.error(e); }
   };

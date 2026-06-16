@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
-import { api } from "../api";
+import { api, authHeaders } from "../api";
 
 const C = {
   bg: "#09090B", s1: "#111114", s2: "#18181C", s3: "#222228",
@@ -41,8 +41,8 @@ export default function HabilitacaoPage() {
 
   useEffect(() => {
     Promise.all([
-      fetch("/api/habilitacao/empresas").then(r => r.json()),
-      fetch("/api/habilitacao/tipos").then(r => r.json()),
+      fetch("/api/habilitacao/empresas", { headers: authHeaders() }).then(r => r.json()),
+      fetch("/api/habilitacao/tipos", { headers: authHeaders() }).then(r => r.json()),
       api.getEditais({ per_page: 500, sort: "-valor_estimado" }),  // via api = manda token = isola por cliente
     ]).then(([emp, tip, ed]) => {
       setEmpresas(emp);

@@ -5,6 +5,12 @@ function _authHeaders() {
   return token ? { Authorization: `Bearer ${token}` } : {};
 }
 
+// Helper público p/ fetch cru — injeta o token (isolamento por empresa).
+// Use em todo fetch() direto: fetch(url, { headers: authHeaders() })
+export function authHeaders(extra = {}) {
+  return { ..._authHeaders(), ...extra };
+}
+
 async function request(url, options = {}) {
   const resp = await fetch(BASE + url, {
     headers: { 'Content-Type': 'application/json', ..._authHeaders(), ...options.headers },
@@ -53,6 +59,7 @@ export const api = {
   competitivo: (pncpId) => request(`/api/editais/${pncpId}/competitivo`, { method: 'POST' }),
   arquivar: (pncpId) => request(`/api/editais/${pncpId}/arquivar`, { method: 'POST' }),
   resetar: (pncpId) => request(`/api/editais/${pncpId}/resetar`, { method: 'POST' }),
+  excluir: (pncpId) => request(`/api/editais/${pncpId}/excluir`, { method: 'DELETE' }),
   listarArquivos: (pncpId) => request(`/api/editais/${pncpId}/pdf/arquivos`),
   uploadPlanilha: async (pncpId, file) => {
     const form = new FormData();

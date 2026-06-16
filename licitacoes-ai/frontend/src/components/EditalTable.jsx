@@ -175,7 +175,7 @@ export default function EditalTable({ editais, onSelect, onRefresh }) {
                     <Btn onClick={async (e) => {
                       e.stopPropagation();
                       if (confirm(`Excluir edital de ${ed.orgao_nome}?`)) {
-                        await fetch(`/api/editais/${ed.pncp_id}/excluir`, { method: "DELETE" });
+                        await api.excluir(ed.pncp_id);
                         onRefresh?.();
                       }
                     }}>✕</Btn>

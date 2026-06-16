@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
+import { authHeaders } from "../api";
 
 const C = {
   bg: "#09090B", s1: "#111114", s2: "#18181C", s3: "#222228",
@@ -98,7 +99,7 @@ export default function PlanilhaPanel() {
   const [batchMsg, setBatchMsg] = useState(null);
 
   const recarregar = () => {
-    fetch("/api/editais?per_page=500&sort=-score_relevancia&abertas=true&status=novo&status=classificado&status=analisado&status=go&status=go_com_ressalvas&status=go_sem_ressalvas&status=precificado&status=competitivo_pronto&status=erro_analise&status=erro_precificacao&status=precificando")
+    fetch("/api/editais?per_page=500&sort=-score_relevancia&abertas=true&status=novo&status=classificado&status=analisado&status=go&status=go_com_ressalvas&status=go_sem_ressalvas&status=precificado&status=competitivo_pronto&status=erro_analise&status=erro_precificacao&status=precificando", { headers: authHeaders() })
       .then(r => r.json())
       .then(data => {
         setEditais(data.items || []);
@@ -112,7 +113,7 @@ export default function PlanilhaPanel() {
   const gerarTodas = () => {
     setGerando(true);
     setBatchMsg(null);
-    fetch("/api/editais/batch/gerar-planilhas", { method: "POST" })
+    fetch("/api/editais/batch/gerar-planilhas", { method: "POST", headers: authHeaders() })
       .then(r => r.json())
       .then(data => {
         setBatchMsg(`${data.total} planilhas sendo geradas em background (sem custo API)`);
@@ -310,7 +311,7 @@ export default function PlanilhaPanel() {
                               if (isNaN(valor_alvo) || valor_alvo <= 0) { alert('Valor inválido'); return; }
                               fetch(`/api/editais/${e.pncp_id}/planilha/calibrar`, {
                                 method: 'POST',
-                                headers: { 'Content-Type': 'application/json' },
+                                headers: authHeaders({ 'Content-Type': 'application/json' }),
                                 body: JSON.stringify({ valor_alvo })
                               })
                               .then(r => r.json())

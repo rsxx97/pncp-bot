@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
-import { api } from "../api";
+import { api, authHeaders } from "../api";
 import EditalTable from "./EditalTable";
 import EditalDetailPanel from "./EditalDetail";
 
@@ -56,7 +56,7 @@ export default function PipelinePage() {
 
   const loadVerificacao = useCallback(async () => {
     try {
-      const r = await fetch("/api/planilhas/verificacao/ultima");
+      const r = await fetch("/api/planilhas/verificacao/ultima", { headers: authHeaders() });
       const d = await r.json();
       if (!d.erro) setVerificacao(d);
     } catch (e) {}
@@ -64,7 +64,7 @@ export default function PipelinePage() {
 
   const loadSkills = useCallback(async () => {
     try {
-      const r = await fetch("/api/planilhas/skills/atual");
+      const r = await fetch("/api/planilhas/skills/atual", { headers: authHeaders() });
       const d = await r.json();
       if (!d.erro) setSkills(d);
     } catch (e) {}
@@ -79,7 +79,7 @@ export default function PipelinePage() {
   const executarVerificacao = async () => {
     setVerificando(true);
     try {
-      await fetch("/api/planilhas/verificacao/executar", { method: "POST" });
+      await fetch("/api/planilhas/verificacao/executar", { method: "POST", headers: authHeaders() });
       // Espera 5s e recarrega
       setTimeout(async () => {
         await loadVerificacao();
