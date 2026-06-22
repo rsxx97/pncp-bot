@@ -31,7 +31,7 @@ def _data_extenso() -> str:
 
 
 def load_empresa(key: str = "manutec") -> dict:
-    """Carrega dados da empresa pelo key."""
+    """Carrega dados da empresa pelo key (config global — fallback/operador)."""
     with open(CONFIG_PATH, "r", encoding="utf-8") as f:
         data = json.load(f)
     for e in data["empresas"]:
@@ -40,8 +40,69 @@ def load_empresa(key: str = "manutec") -> dict:
     return data["empresas"][0]
 
 
+def empresa_from_tenant(emp: dict) -> dict:
+    """Converte uma empresa do tenant (tabela tenant_empresas) no shape que as
+    declarações esperam. Cada cliente gera com OS DADOS DELE, não da Manutec.
+
+    Tolera campos faltando (string vazia) pra nunca quebrar a geração — os campos
+    em branco aparecem vazios na declaração e o cliente completa no perfil.
+    """
+    def _as_dict(v):
+        if isinstance(v, dict):
+            return v
+        if isinstance(v, str) and v.strip():
+            try:
+                return json.loads(v)
+            except (json.JSONDecodeError, TypeError):
+                return {}
+        return {}
+
+    end = _as_dict(emp.get("endereco") or emp.get("endereco_json"))
+    rep = _as_dict(emp.get("representante_legal") or emp.get("representante_legal_json"))
+    return {
+        "razao_social": emp.get("nome") or emp.get("razao_social") or "",
+        "nome_fantasia": emp.get("nome_fantasia", ""),
+        "cnpj": emp.get("cnpj") or "",
+        "porte": emp.get("porte") or "ME",
+        "endereco": {
+            "logradouro": end.get("logradouro", ""),
+            "numero": end.get("numero", ""),
+            "complemento": end.get("complemento", ""),
+            "bairro": end.get("bairro", ""),
+            "cidade": end.get("cidade", ""),
+            "uf": end.get("uf", ""),
+            "cep": end.get("cep", ""),
+        },
+        "representante_legal": {
+            "nome": rep.get("nome", ""),
+            "cargo": rep.get("cargo", "Representante Legal"),
+            "rg": rep.get("rg", ""),
+            "orgao_emissor": rep.get("orgao_emissor", ""),
+            "cpf": rep.get("cpf", ""),
+            "nacionalidade": rep.get("nacionalidade", "brasileiro(a)"),
+            "estado_civil": rep.get("estado_civil", ""),
+        },
+        "inscricao_estadual": emp.get("inscricao_estadual", ""),
+        "inscricao_municipal": emp.get("inscricao_municipal", ""),
+        "logo_path": emp.get("logo_path", ""),
+    }
+
+
 _FONTS_INITIALIZED = False
 _FONT_NAME = "Helvetica"
+# Logo da empresa em uso na geração corrente (setado por gerar_pacote_completo).
+# Cada empresa tem o seu — assim a declaração sai com a marca do cliente logado.
+_DEFAULT_LOGO = None
+
+
+def _resolver_logo(logo_path):
+    """Resolve o caminho do logo (absoluto ou relativo ao projeto). None se não existir."""
+    if not logo_path:
+        return None
+    p = Path(logo_path)
+    if not p.is_absolute():
+        p = BASE_DIR / logo_path
+    return str(p) if p.exists() else None
 
 def _ensure_unicode_font(pdf: FPDF):
     """Tenta usar Arial (Windows) com Unicode, senão cai pra Helvetica."""
@@ -60,9 +121,10 @@ def _ensure_unicode_font(pdf: FPDF):
 class DeclaracaoPDF(FPDF):
     """PDF customizado para declarações."""
 
-    def __init__(self, titulo: str = "DECLARAÇÃO"):
+    def __init__(self, titulo: str = "DECLARAÇÃO", logo_path: str = None):
         super().__init__()
         self.titulo = titulo
+        self.logo_path = _resolver_logo(logo_path or _DEFAULT_LOGO)
         _ensure_unicode_font(self)
         self.font_name = _FONT_NAME
         self.set_auto_page_break(auto=True, margin=20)
@@ -70,6 +132,14 @@ class DeclaracaoPDF(FPDF):
         self.set_margins(25, 25, 25)
 
     def header(self):
+        # Logo da empresa centralizado no topo (se houver).
+        if self.logo_path:
+            try:
+                w = 38
+                self.image(self.logo_path, x=(self.w - w) / 2, y=10, w=w)
+                self.set_y(10 + w * 0.62 + 4)  # desce abaixo do logo
+            except Exception:
+                pass
         self.set_font(getattr(self, "font_name", "Helvetica"), "B", 14)
         self.cell(0, 10, self.titulo, align="C", new_x="LMARGIN", new_y="NEXT")
         self.ln(5)
@@ -389,13 +459,23 @@ def gerar_pacote_completo(
     edital_info: dict,
     empresa_key: str = "manutec",
     tipos: list[str] = None,
+    empresa: dict = None,
 ) -> Path:
-    """Gera pacote ZIP com todas as declarações preenchidas para um edital."""
-    import zipfile
-    from io import BytesIO
+    """Gera pacote ZIP com todas as declarações preenchidas para um edital.
 
-    empresa = load_empresa(empresa_key)
+    `empresa` (dict já no shape do gerador) tem precedência — é o caminho
+    multi-tenant: cada cliente gera com OS DADOS DELE. Sem ele, cai no config
+    global por `empresa_key` (operador/legado).
+    """
+    import zipfile
+
+    if empresa is None:
+        empresa = load_empresa(empresa_key)
     tipos = tipos or list(TIPOS_DISPONIVEIS.keys())
+
+    # Logo da empresa logada (cai pra None se não tiver — declaração sai sem marca).
+    global _DEFAULT_LOGO
+    _DEFAULT_LOGO = empresa.get("logo_path")
 
     pncp_id = edital_info.get("pncp_id", "edital")
     safe_id = pncp_id.replace("/", "_").replace("-", "_")
@@ -425,6 +505,7 @@ def gerar_pacote_completo(
             zf.write(str(arq), arq.name)
 
     log.info(f"Pacote completo: {zip_path} ({len(arquivos_gerados)} declarações)")
+    _DEFAULT_LOGO = None
     return zip_path
 
 

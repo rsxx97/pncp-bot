@@ -21,6 +21,13 @@ class EmpresaCreate(BaseModel):
     cnaes: list[str] = []
     uf_atuacao: list[str] = ["RJ"]
     restricoes: dict = {}
+    # Identidade de habilitação (alimenta o gerador de declarações por login)
+    nome_fantasia: str = ""
+    porte: str = "ME"
+    endereco: dict = {}
+    representante_legal: dict = {}
+    inscricao_estadual: str = ""
+    inscricao_municipal: str = ""
 
 
 class EmpresaUpdate(BaseModel):
@@ -38,6 +45,12 @@ class EmpresaUpdate(BaseModel):
     cnaes: list[str] = None
     uf_atuacao: list[str] = None
     restricoes: dict = None
+    nome_fantasia: str = None
+    porte: str = None
+    endereco: dict = None
+    representante_legal: dict = None
+    inscricao_estadual: str = None
+    inscricao_municipal: str = None
 
 
 @router.get("/empresas")
@@ -82,6 +95,12 @@ def criar_empresa(body: EmpresaCreate, tenant: dict = Depends(require_tenant)):
         "cnaes_json": body.cnaes,
         "uf_atuacao_json": body.uf_atuacao,
         "restricoes_json": body.restricoes,
+        "nome_fantasia": body.nome_fantasia,
+        "porte": body.porte,
+        "endereco_json": body.endereco,
+        "representante_legal_json": body.representante_legal,
+        "inscricao_estadual": body.inscricao_estadual,
+        "inscricao_municipal": body.inscricao_municipal,
     }
 
     empresa_id = criar_tenant_empresa(tenant["id"], data)
@@ -99,7 +118,8 @@ def atualizar_empresa(empresa_id: int, body: EmpresaUpdate, tenant: dict = Depen
 
     updates = {}
     for field, val in body.model_dump(exclude_none=True).items():
-        if field in ("servicos", "atestados", "cnaes", "uf_atuacao", "restricoes"):
+        if field in ("servicos", "atestados", "cnaes", "uf_atuacao", "restricoes",
+                     "endereco", "representante_legal"):
             updates[f"{field}_json"] = val
         else:
             updates[field] = val

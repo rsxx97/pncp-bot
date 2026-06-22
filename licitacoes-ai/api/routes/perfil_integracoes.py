@@ -42,6 +42,7 @@ class IntegracoesUpdate(BaseModel):
     trello_token: str | None = None
     trello_board_id: str | None = None
     drive_folder_id: str | None = None
+    telegram_chat_id: str | None = None
 
 
 @router.get("/{empresa_id}/integracoes")
@@ -56,6 +57,8 @@ def get_integracoes(empresa_id: int, tenant: dict = Depends(require_tenant)):
         "trello_board_id": emp.get("trello_board_id"),
         "drive_folder_id": emp.get("drive_folder_id"),
         "drive_sa_disponivel": bool(os.environ.get("GOOGLE_SA_JSON")),
+        "telegram_chat_id": emp.get("telegram_chat_id"),
+        "telegram_bot_disponivel": bool(os.environ.get("TELEGRAM_BOT_TOKEN")),
     }
 
 
@@ -128,6 +131,21 @@ def testar_drive(empresa_id: int, tenant: dict = Depends(require_tenant)):
         return {"ok": True, "pasta_nome": info.get("name"), "url": info.get("webViewLink")}
     except Exception as e:
         raise HTTPException(400, f"Erro ao acessar pasta no Drive: {e}")
+
+
+@router.post("/{empresa_id}/sincronizar-calendario")
+def sincronizar_calendario_endpoint(empresa_id: int, tenant: dict = Depends(require_tenant)):
+    """Sincroniza TODOS os editais do tenant como cards no Trello (vista Calendário).
+
+    Idempotente: cria os que faltam, atualiza os existentes (prazo/descrição).
+    É o que a automação diária roda sozinha — aqui é o gatilho manual ('Sincronizar agora').
+    """
+    emp = _get_empresa_do_tenant(empresa_id, tenant["id"])
+    from shared.trello_calendario import sincronizar_calendario
+    res = sincronizar_calendario(emp, tenant["id"])
+    if not res.get("ok"):
+        raise HTTPException(400, res.get("erro", "Falha ao sincronizar"))
+    return res
 
 
 class SincronizarEditalRequest(BaseModel):

@@ -76,8 +76,8 @@ export default function HabilitacaoPage() {
     try {
       const r = await fetch(`/api/habilitacao/edital/${pncp_id}/gerar`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ empresa_key: empresaSelecionada?.key || "manutec" }),
+        headers: { "Content-Type": "application/json", ...authHeaders() },
+        body: JSON.stringify({ empresa_id: empresaSelecionada?.key ? Number(empresaSelecionada.key) : null }),
       });
       const d = await r.json();
       if (d.ok) {

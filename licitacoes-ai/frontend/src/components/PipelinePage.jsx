@@ -44,6 +44,25 @@ export default function PipelinePage() {
   const [verificacao, setVerificacao] = useState(null);
   const [skills, setSkills] = useState(null);
   const [verificando, setVerificando] = useState(false);
+  const [sincT, setSincT] = useState({ loading: false, msg: "" });
+
+  const sincronizarTrello = useCallback(async () => {
+    setSincT({ loading: true, msg: "" });
+    try {
+      const er = await fetch("/api/perfil/empresas", { headers: authHeaders() });
+      const empresas = await er.json();
+      if (!empresas?.length) { setSincT({ loading: false, msg: "Cadastre sua empresa em Perfil primeiro." }); return; }
+      const r = await fetch(`/api/perfil/empresas/${empresas[0].id}/sincronizar-calendario`, { method: "POST", headers: authHeaders() });
+      const d = await r.json();
+      if (r.ok) {
+        setSincT({ loading: false, msg: `✓ ${d.criados} criados, ${d.atualizados} atualizados${d.telegram ? " · Telegram enviado ✓" : ""}` });
+      } else {
+        setSincT({ loading: false, msg: d.detail || "Configure o Trello em Perfil → Integrações." });
+      }
+    } catch (e) {
+      setSincT({ loading: false, msg: "Erro ao sincronizar." });
+    }
+  }, []);
 
   const loadEditais = useCallback(async () => {
     try {
@@ -161,6 +180,19 @@ export default function PipelinePage() {
         <Card><Stat label="Obra/Reforma" value={stats.obra} color={C.bl} /></Card>
         <Card><Stat label="Com Planilha" value={stats.comPlanilha} color={C.ac} sub={`${((stats.comPlanilha/stats.total)*100||0).toFixed(0)}%`} /></Card>
         <Card><Stat label="Volume Total" value={fmt(stats.volume)} color={C.am} /></Card>
+      </div>
+
+      {/* Ação: empurra o Pipeline pro calendário Trello + avisa no Telegram */}
+      <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16 }}>
+        <button onClick={sincronizarTrello} disabled={sincT.loading}
+          style={{
+            fontFamily: mono, fontSize: 11, padding: "7px 14px", borderRadius: 6, border: "none",
+            background: sincT.loading ? C.s3 : C.bl, color: "#fff",
+            cursor: sincT.loading ? "wait" : "pointer", fontWeight: 700,
+          }}>
+          {sincT.loading ? "Sincronizando…" : "🔄 Sincronizar Trello + Telegram"}
+        </button>
+        {sincT.msg && <span style={{ fontSize: 11, color: C.t2 }}>{sincT.msg}</span>}
       </div>
 
       {/* Painel de verificação e skills */}

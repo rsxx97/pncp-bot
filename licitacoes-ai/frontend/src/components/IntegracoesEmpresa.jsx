@@ -16,6 +16,7 @@ export default function IntegracoesEmpresa({ empresaId, empresaNome }) {
   const [testando, setTestando] = useState(null);
   const [msg, setMsg] = useState("");
   const [erro, setErro] = useState("");
+  const [sincronizando, setSincronizando] = useState(false);
 
   const token = localStorage.getItem("token");
   const h = { Authorization: `Bearer ${token}`, "Content-Type": "application/json" };
@@ -75,6 +76,21 @@ export default function IntegracoesEmpresa({ empresaId, empresaNome }) {
     setTestando(null);
   };
 
+  const sincronizarCalendario = async () => {
+    setSincronizando(true);
+    setMsg(""); setErro("");
+    const r = await fetch(`/api/perfil/empresas/${empresaId}/sincronizar-calendario`, {
+      method: "POST", headers: h,
+    });
+    const d = await r.json();
+    if (r.ok) {
+      setMsg(`📅 Calendário sincronizado: ${d.criados} criados, ${d.atualizados} atualizados${d.erros ? `, ${d.erros} erros` : ""} (de ${d.total} editais com prazo).`);
+    } else {
+      setErro(d.detail || "Falha ao sincronizar");
+    }
+    setSincronizando(false);
+  };
+
   if (!data) return <div style={{ color: "#AEAEA8" }}>Carregando…</div>;
 
   return (
@@ -120,6 +136,15 @@ export default function IntegracoesEmpresa({ empresaId, empresaNome }) {
 
         <div style={{ fontSize: 11, color: "#6B7280", marginTop: 8 }}>
           Não tem? <a href="https://trello.com/power-ups/admin" target="_blank" rel="noreferrer" style={{ color: "#2563EB" }}>Crie um Power-Up</a> e gere API Key + Token.
+        </div>
+
+        <div style={{ marginTop: 12, paddingTop: 12, borderTop: "1px solid #F3F4F6", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12 }}>
+          <span style={{ fontSize: 11, color: "#6B7280" }}>
+            📅 <strong>Calendário automático:</strong> todo dia, cada edital com prazo vira um card com vencimento no board (vista Calendário do Trello).
+          </span>
+          <button onClick={sincronizarCalendario} disabled={sincronizando} style={{ ...btnPrimary, whiteSpace: "nowrap" }}>
+            {sincronizando ? "Sincronizando…" : "Sincronizar agora"}
+          </button>
         </div>
       </div>
 

@@ -126,14 +126,16 @@ CREATE TABLE IF NOT EXISTS ccts (
 -- Concorrentes monitorados
 CREATE TABLE IF NOT EXISTS concorrentes (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    cnpj TEXT UNIQUE NOT NULL,
+    tenant_id INTEGER,
+    cnpj TEXT NOT NULL,
     razao_social TEXT,
     nome_fantasia TEXT,
     segmentos TEXT,
     uf_atuacao TEXT,
     notas TEXT,
     ativo BOOLEAN DEFAULT 1,
-    created_at TEXT DEFAULT (datetime('now'))
+    created_at TEXT DEFAULT (datetime('now')),
+    UNIQUE(cnpj, tenant_id)
 );
 
 -- Log de execuções dos agentes
@@ -302,6 +304,10 @@ def _aplicar_migrations(conn):
     if not _coluna_existe(conn, "editais", "tenant_id"):
         conn.execute("ALTER TABLE editais ADD COLUMN tenant_id INTEGER")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_editais_tenant ON editais(tenant_id)")
+    # Isolamento da tela Disputa (tabela pregoes) por empresa
+    if not _coluna_existe(conn, "pregoes", "tenant_id"):
+        conn.execute("ALTER TABLE pregoes ADD COLUMN tenant_id INTEGER")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_pregoes_tenant ON pregoes(tenant_id)")
     if not _coluna_existe(conn, "editais", "tenant_empresa_id"):
         conn.execute("ALTER TABLE editais ADD COLUMN tenant_empresa_id INTEGER")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_editais_tenant_empresa ON editais(tenant_empresa_id)")
@@ -312,6 +318,49 @@ def _aplicar_migrations(conn):
     for col in ("trello_api_key", "trello_token", "trello_board_id", "drive_folder_id"):
         if not _coluna_existe(conn, "tenant_empresas", col):
             conn.execute(f"ALTER TABLE tenant_empresas ADD COLUMN {col} TEXT")
+
+    # Identidade de habilitação por empresa-tenant: alimenta o gerador de
+    # declarações com os dados da EMPRESA LOGADA (não mais o config global).
+    for col in ("nome_fantasia", "porte", "endereco_json", "representante_legal_json",
+                "inscricao_estadual", "inscricao_municipal", "logo_path", "telegram_chat_id"):
+        if not _coluna_existe(conn, "tenant_empresas", col):
+            conn.execute(f"ALTER TABLE tenant_empresas ADD COLUMN {col} TEXT")
+
+    # Isolamento da tela Concorrentes (intel competitiva é privada por cliente).
+    # Rebuild não-destrutivo: troca UNIQUE(cnpj) global por UNIQUE(cnpj, tenant_id)
+    # pra dois clientes poderem monitorar o mesmo concorrente. Linhas legadas
+    # (config global MANUTEC) ficam com tenant_id=NULL → invisíveis pros clientes,
+    # visíveis só pro operador (super_admin vê 1=1).
+    if not _coluna_existe(conn, "concorrentes", "tenant_id"):
+        try:
+            conn.executescript(
+                """
+                CREATE TABLE concorrentes_new (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    tenant_id INTEGER,
+                    cnpj TEXT NOT NULL,
+                    razao_social TEXT,
+                    nome_fantasia TEXT,
+                    segmentos TEXT,
+                    uf_atuacao TEXT,
+                    notas TEXT,
+                    ativo BOOLEAN DEFAULT 1,
+                    created_at TEXT DEFAULT (datetime('now')),
+                    UNIQUE(cnpj, tenant_id)
+                );
+                INSERT INTO concorrentes_new
+                    (id, tenant_id, cnpj, razao_social, nome_fantasia, segmentos, uf_atuacao, notas, ativo, created_at)
+                    SELECT id, NULL, cnpj, razao_social, nome_fantasia, segmentos, uf_atuacao, notas, ativo, created_at
+                    FROM concorrentes;
+                DROP TABLE concorrentes;
+                ALTER TABLE concorrentes_new RENAME TO concorrentes;
+                CREATE INDEX IF NOT EXISTS idx_concorrentes_tenant ON concorrentes(tenant_id);
+                """
+            )
+        except Exception as _e:
+            # Nunca derruba o boot do servidor por causa dessa migração.
+            import logging
+            logging.getLogger("database").warning(f"Migração de isolamento de concorrentes pulada: {_e}")
 
     # Cota do plano Radar (paridade eLicitaRadar)
     if not _coluna_existe(conn, "tenants", "plano_radar_limite"):
@@ -690,10 +739,16 @@ def listar_ccts_ativas() -> list[dict]:
 
 # ── CRUD: Concorrentes ─────────────────────────────────────────────────
 
-def upsert_concorrente(cnpj: str, **data) -> int:
+def upsert_concorrente(cnpj: str, tenant_id: int | None = None, **data) -> int:
+    """Insere/atualiza concorrente escopado ao tenant (isolamento competitivo).
+
+    Dedup por (cnpj, tenant_id): o mesmo concorrente pode ser monitorado por
+    clientes diferentes sem colidir.
+    """
     conn = get_db()
     existing = conn.execute(
-        "SELECT id FROM concorrentes WHERE cnpj = ?", (cnpj,)
+        "SELECT id FROM concorrentes WHERE cnpj = ? AND tenant_id IS ?",
+        (cnpj, tenant_id),
     ).fetchone()
 
     if existing:
@@ -704,15 +759,18 @@ def upsert_concorrente(cnpj: str, **data) -> int:
                 v = json.dumps(v, ensure_ascii=False)
             sets.append(f"{k} = ?")
             vals.append(v)
-        vals.append(cnpj)
+        if not sets:
+            return existing["id"]
+        vals.extend([cnpj, tenant_id])
         conn.execute(
-            f"UPDATE concorrentes SET {', '.join(sets)} WHERE cnpj = ?", vals
+            f"UPDATE concorrentes SET {', '.join(sets)} WHERE cnpj = ? AND tenant_id IS ?",
+            vals,
         )
         conn.commit()
         return existing["id"]
     else:
-        cols = ["cnpj"] + list(data.keys())
-        vals = [cnpj]
+        cols = ["cnpj", "tenant_id"] + list(data.keys())
+        vals = [cnpj, tenant_id]
         for v in data.values():
             if isinstance(v, (list, dict)):
                 v = json.dumps(v, ensure_ascii=False)
@@ -909,7 +967,8 @@ def get_tenant_empresas(tenant_id: int) -> list[dict]:
     result = []
     for r in rows:
         d = dict(r)
-        for field in ("servicos_json", "atestados_json", "cnaes_json", "uf_atuacao_json", "restricoes_json"):
+        for field in ("servicos_json", "atestados_json", "cnaes_json", "uf_atuacao_json",
+                      "restricoes_json", "endereco_json", "representante_legal_json"):
             if d.get(field):
                 try:
                     d[field] = json.loads(d[field])

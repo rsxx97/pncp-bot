@@ -2,16 +2,19 @@
 import json
 import sys
 from pathlib import Path
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Depends
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
 
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 from agente_habilitacao.declaracao_builder import (
-    gerar_pacote_completo, load_empresa, TIPOS_DISPONIVEIS, CONFIG_PATH, OUTPUT_DIR,
+    gerar_pacote_completo, load_empresa, empresa_from_tenant,
+    TIPOS_DISPONIVEIS, CONFIG_PATH, OUTPUT_DIR,
 )
-from api.deps import get_connection
+from api.deps import get_connection, tenant_filter_sql
+from api.routes.auth import require_tenant, require_admin
+from shared.database import get_tenant_empresas
 
 
 router = APIRouter(prefix="/api/habilitacao", tags=["habilitacao"])
@@ -27,11 +30,27 @@ def listar_tipos():
 
 
 @router.get("/empresas")
-def listar_empresas():
-    """Lista empresas cadastradas para habilitação."""
-    with open(CONFIG_PATH, "r", encoding="utf-8") as f:
-        data = json.load(f)
-    return data.get("empresas", [])
+def listar_empresas(tenant: dict = Depends(require_tenant)):
+    """Lista empresas do CLIENTE LOGADO (isolado por tenant). Nunca o config global."""
+    empresas = get_tenant_empresas(tenant["id"]) or []
+    # Mapeia pro shape que a tela de habilitação espera (razao_social/cnpj/...).
+    out = []
+    for e in empresas:
+        out.append({
+            "key": str(e.get("id")),
+            "razao_social": e.get("nome") or e.get("razao_social") or "",
+            "nome_fantasia": e.get("nome_fantasia", ""),
+            "cnpj": e.get("cnpj") or "",
+            "regime_tributario": e.get("regime_tributario", ""),
+            "porte": e.get("porte", "ME"),
+            "endereco": e.get("endereco", {}) if isinstance(e.get("endereco"), dict) else {},
+            "contato": e.get("contato", {}) if isinstance(e.get("contato"), dict) else {},
+            "representante_legal": e.get("representante_legal", {}) if isinstance(e.get("representante_legal"), dict) else {},
+            "banco": e.get("banco", {}) if isinstance(e.get("banco"), dict) else {},
+            "inscricao_estadual": e.get("inscricao_estadual", ""),
+            "inscricao_municipal": e.get("inscricao_municipal", ""),
+        })
+    return out
 
 
 class EmpresaUpdate(BaseModel):
@@ -50,8 +69,8 @@ class EmpresaUpdate(BaseModel):
 
 
 @router.put("/empresas/{key}")
-def atualizar_empresa(key: str, body: EmpresaUpdate):
-    """Atualiza dados da empresa."""
+def atualizar_empresa(key: str, body: EmpresaUpdate, _admin: dict = Depends(require_admin)):
+    """Atualiza o config GLOBAL de empresa — operador só. Cliente edita a empresa dele em /api/perfil."""
     with open(CONFIG_PATH, "r", encoding="utf-8") as f:
         data = json.load(f)
 
@@ -70,19 +89,32 @@ def atualizar_empresa(key: str, body: EmpresaUpdate):
 
 
 class GerarPacoteRequest(BaseModel):
-    empresa_key: str = "manutec"
+    empresa_id: int = None   # qual empresa do tenant usar (default: a 1ª)
     tipos: list[str] = None
 
 
 @router.post("/edital/{pncp_id:path}/gerar")
-def gerar_para_edital(pncp_id: str, body: GerarPacoteRequest = None):
-    """Gera pacote de habilitação para um edital."""
+def gerar_para_edital(pncp_id: str, body: GerarPacoteRequest = None,
+                      tenant: dict = Depends(require_tenant)):
+    """Gera o pacote de declarações com os dados da EMPRESA LOGADA (por tenant)."""
     body = body or GerarPacoteRequest()
 
+    # Edital tem que pertencer ao tenant logado (isolamento).
     conn = get_connection()
-    row = conn.execute("SELECT * FROM editais WHERE pncp_id = ?", (pncp_id,)).fetchone()
+    t_sql, t_params = tenant_filter_sql(tenant)
+    row = conn.execute(
+        f"SELECT * FROM editais WHERE pncp_id = ? AND {t_sql}", (pncp_id, *t_params)
+    ).fetchone()
     if not row:
         raise HTTPException(404, "Edital não encontrado")
+
+    # Empresa do tenant → dados das declarações. Sem cadastro = avisa.
+    empresas = get_tenant_empresas(tenant["id"]) or []
+    if not empresas:
+        raise HTTPException(400, "Cadastre os dados da sua empresa em Perfil antes de gerar a documentação.")
+    if body.empresa_id:
+        empresas = [e for e in empresas if e["id"] == body.empresa_id] or empresas
+    empresa = empresa_from_tenant(empresas[0])
 
     edital_info = {
         "pncp_id": pncp_id,
@@ -94,7 +126,7 @@ def gerar_para_edital(pncp_id: str, body: GerarPacoteRequest = None):
     }
 
     try:
-        zip_path = gerar_pacote_completo(edital_info, body.empresa_key, body.tipos)
+        zip_path = gerar_pacote_completo(edital_info, tipos=body.tipos, empresa=empresa)
     except Exception as e:
         raise HTTPException(500, f"Erro ao gerar pacote: {e}")
 

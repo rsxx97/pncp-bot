@@ -59,6 +59,21 @@ def health():
     return {"status": "ok", "service": "licitacoes-ai"}
 
 
+def _loop_trello_diario():
+    """Sincroniza o calendário Trello de todas as empresas, 1x/dia (configurável)."""
+    import os, time
+    horas = int(os.environ.get("TRELLO_SYNC_HORAS", 24))
+    time.sleep(90)  # deixa a API estabilizar antes da 1ª passada
+    while True:
+        try:
+            from shared.trello_calendario import sincronizar_todas
+            res = sincronizar_todas()
+            log.info(f"Sync Trello diário: {res['empresas']} empresa(s) processada(s)")
+        except Exception as e:
+            log.exception(f"Erro no sync Trello diário: {e}")
+        time.sleep(horas * 3600)
+
+
 @app.on_event("startup")
 def startup():
     init_db()
@@ -68,6 +83,12 @@ def startup():
         iniciar(intervalo_seg=10)
     except Exception as e:
         log.exception(f"Falha iniciando scheduler do Radar: {e}")
+    try:
+        import threading
+        threading.Thread(target=_loop_trello_diario, daemon=True).start()
+        log.info("Automação diária do calendário Trello ativada")
+    except Exception as e:
+        log.exception(f"Falha iniciando sync Trello diário: {e}")
 
 
 @app.on_event("shutdown")
